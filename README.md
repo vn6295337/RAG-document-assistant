@@ -1,34 +1,49 @@
-# poc-rag
+---
+title: RAG PoC
+emoji: 🔍
+colorFrom: blue
+colorTo: purple
+sdk: streamlit
+sdk_version: "1.40.0"
+app_file: app.py
+pinned: false
+---
 
-## Elevator pitch (3 lines)
-Retrieval-Augmented Generation (RAG) prototype that answers policy/process queries from uploaded documents with source citations and traceable evidence.  
-Proves end-to-end ingestion → vector index → retrieval → LLM synthesis with transparent citations.  
-Designed for rapid deployment on Cloud Run for low-cost, demo-ready operations.
+# RAG Proof of Concept
 
-## What this proves (3 bullets)
-- Ingestion, chunking, and embedding pipeline integrated with Pinecone/Neon.  
-- Reliable retrieval-to-LLM orchestration producing cited answers suitable for CXO demos.  
-- Production-capable Streamlit UI deployed on Cloud Run using Buildpacks.
+A Retrieval-Augmented Generation (RAG) system built with:
+- **Semantic Search**: sentence-transformers (all-MiniLM-L6-v2)
+- **Vector Database**: Pinecone (384-dim embeddings)
+- **LLM Generation**: Gemini, Groq, or OpenRouter
+- **UI**: Streamlit
 
-## Quick start
-1. Create a Python 3.10+ virtual environment and install deps from `requirements.txt`.  
-2. Populate `.env` with `PINECONE_API_KEY`, `PINECONE_ENV`, `OPENAI_API_KEY` (or Claude key).  
-3. Run `python ingestion/run_ingest.py` to load sample documents.  
-4. Run `streamlit run ui/app.py` locally or follow `docs/run.md` to deploy to Cloud Run.
+## Features
 
-## Live demo
-- Demo URL: _(add Cloud Run URL after deployment)_  
-- Demo GIF: docs/demo.gif
+- ✅ Semantic document retrieval
+- ✅ Multi-provider LLM support (automatic fallback)
+- ✅ Citation tracking
+- ✅ Real-time query interface
 
-## Repo layout
-- `ingestion/` — document loaders, chunking, embedding scripts  
-- `retrieval/` — vector DB client and similarity search logic  
-- `src/` — orchestration and LLM prompt logic  
-- `ui/` — Streamlit app for query + citation display  
-- `docs/` — architecture, implement, and run documentation
+## Architecture
 
-## Tech stack
-Pinecone/Neon, OpenAI/Claude, Streamlit, Python, Cloud Run, Buildpacks
+```
+User Query → Semantic Embedding → Pinecone Search → LLM Generation → Answer + Citations
+```
 
-## License
-MIT
+## Try it!
+
+Enter a question like:
+- "what is GDPR"
+- "what are privacy requirements"
+- "how does data protection work"
+
+## Tech Stack
+
+- **Embeddings**: sentence-transformers (free, local)
+- **Vector DB**: Pinecone (serverless)
+- **LLM**: Gemini 2.5 Flash (primary)
+- **Framework**: Streamlit
+
+---
+
+Built with [Claude Code](https://claude.com/claude-code)
