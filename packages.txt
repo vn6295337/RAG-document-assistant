@@ -1,2 +1,0 @@
-# System packages required for Streamlit Cloud
-# (Currently none needed, but file must exist for some deployments)
