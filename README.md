@@ -36,7 +36,9 @@ This PoC validates three critical capabilities for production RAG systems:
 
 ### 🎬 Demo Video
 
-https://github.com/vn6295337/poc-rag/assets/demo.mp4
+[📹 Watch Demo Video](https://github.com/vn6295337/poc-rag/blob/main/docs/demo.mp4)
+
+*Click the link above to download and watch the demo, or try the [Live Demo](https://huggingface.co/spaces/vn6295337/rag-poc) directly!*
 
 **Sample Queries:**
 - "what is GDPR"
