@@ -1,9 +1,9 @@
 # Core dependencies for RAG PoC deployment
-streamlit==1.52.0
-pinecone==8.0.0
-sentence-transformers==5.1.2
-requests==2.32.5
+streamlit>=1.40.0
+pinecone-client>=3.0.0
+sentence-transformers>=2.2.0
+requests>=2.31.0
 
 # PyTorch CPU-only (lightweight for deployment)
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.9.1+cpu
+torch
