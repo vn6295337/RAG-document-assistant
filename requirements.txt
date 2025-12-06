@@ -1,6 +1,6 @@
 # Core dependencies for RAG PoC deployment
 streamlit>=1.40.0
-pinecone-client>=3.0.0
+pinecone>=5.0.0
 sentence-transformers>=2.2.0
 requests>=2.31.0
 
