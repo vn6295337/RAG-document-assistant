@@ -23,18 +23,18 @@
 
 ## Development Timeline
 
-### Day 1  Environment Setup & Foundation
+### Day 1  Environment Setup & Foundation
 **Goal**: Establish development environment and infrastructure
 
 **Completed**:
--  Created GCP project (`ai-portfolio-v2`)
--  Installed and authenticated `gcloud` CLI
--  Created GitHub repository: `poc-rag`
--  Set up Python virtual environment (`~/aienv`)
--  Configured local secrets storage (`~/secrets/`)
--  Obtained API keys: Gemini, Groq, OpenRouter, Pinecone
--  Created Pinecone index: `joyful-hickory` (1024-dim, cosine)
--  Built unified `src/config.py` for multi-provider support
+-  Created GCP project (`ai-portfolio-v2`)
+-  Installed and authenticated `gcloud` CLI
+-  Created GitHub repository: `poc-rag`
+-  Set up Python virtual environment (`~/aienv`)
+-  Configured local secrets storage (`~/secrets/`)
+-  Obtained API keys: Gemini, Groq, OpenRouter, Pinecone
+-  Created Pinecone index: `joyful-hickory` (1024-dim, cosine)
+-  Built unified `src/config.py` for multi-provider support
 
 **Key Decisions**:
 - **Local git over Cloud Shell**: Better IDE integration, familiar workflow
@@ -48,33 +48,33 @@ pip install python-dotenv  # Environment variable management
 
 ---
 
-### Day 2  Cloud Shell Familiarization
+### Day 2  Cloud Shell Familiarization
 **Goal**: Validate CLI tooling and cloud workflow
 
 **Completed**:
--  Verified Python 3.11+ and venv activation
--  Tested `gcloud` commands (services, regions)
--  Validated git workflow (commit, push)
--  Verified Cloud Run logs access
+-  Verified Python 3.11+ and venv activation
+-  Tested `gcloud` commands (services, regions)
+-  Validated git workflow (commit, push)
+-  Verified Cloud Run logs access
 
 **Key Findings**:
-- Docker and `pack` not installed ’ Decided on Cloud Run native Buildpacks workflow
-- Local CLI workflow validated ’ Proceed with local development
+- Docker and `pack` not installed ' Decided on Cloud Run native Buildpacks workflow
+- Local CLI workflow validated ' Proceed with local development
 
 ---
 
-### Day 3  RAG PoC: Ingestion Setup
+### Day 3  RAG PoC: Ingestion Setup
 **Goal**: Build document ingestion pipeline
 
 **Completed**:
--  Created ingestion directory structure
--  Implemented `load_docs.py` (markdown cleaning)
--  Implemented `chunker.py` (deterministic text splitting)
--  Implemented `embeddings.py` (provider-agnostic stub)
--  Generated 44 chunks from 5 GDPR documents
--  Created 64-dim offline embeddings (hash-based)
--  Validated local retrieval pipeline (cosine similarity)
--  Connected to Pinecone index `joyful-hickory`
+-  Created ingestion directory structure
+-  Implemented `load_docs.py` (markdown cleaning)
+-  Implemented `chunker.py` (deterministic text splitting)
+-  Implemented `embeddings.py` (provider-agnostic stub)
+-  Generated 44 chunks from 5 GDPR documents
+-  Created 64-dim offline embeddings (hash-based)
+-  Validated local retrieval pipeline (cosine similarity)
+-  Connected to Pinecone index `joyful-hickory`
 
 **Key Implementations**:
 ```python
@@ -93,21 +93,21 @@ def chunk_text(text, max_tokens=300, overlap=50):
     # Return list of text chunks
 ```
 
-**Challenge**: Pinecone key format correction ’ Fixed by removing extra characters
+**Challenge**: Pinecone key format correction ' Fixed by removing extra characters
 
 ---
 
-### Day 4  RAG PoC: Vector DB Integration
+### Day 4  RAG PoC: Vector DB Integration
 **Goal**: Integrate Pinecone vector database
 
 **Completed**:
--  Validated Pinecone index metadata (1024-dim, cosine, ready)
--  Consolidated ingestion output to `data/chunks.jsonl`
--  Implemented deterministic 1024-dim SHA-256 embeddings
--  Sanitized metadata (removed `None` values)
--  Successfully upserted all 44 embeddings to Pinecone
--  Created `retrieval/test_retrieval.py` for top-K search
--  Validated retrieval quality (structural correctness, ranking)
+-  Validated Pinecone index metadata (1024-dim, cosine, ready)
+-  Consolidated ingestion output to `data/chunks.jsonl`
+-  Implemented deterministic 1024-dim SHA-256 embeddings
+-  Sanitized metadata (removed `None` values)
+-  Successfully upserted all 44 embeddings to Pinecone
+-  Created `retrieval/test_retrieval.py` for top-K search
+-  Validated retrieval quality (structural correctness, ranking)
 
 **Key Implementations**:
 ```python
@@ -119,28 +119,28 @@ def deterministic_embedding(text: str, dim: int = 1024):
 ```
 
 **Challenges Solved**:
-1. **Missing `PINECONE_API_KEY`** ’ Exported in venv activation script
-2. **Chunk file not found** ’ Copied to `data/chunks.jsonl`
-3. **Pinecone rejected `null` metadata** ’ Metadata sanitization function
-4. **`IndexModel` not JSON serializable** ’ Used `.to_dict()` + fallback extraction
-5. **Pinecone response format variation** ’ Normalized with `getattr` + `dict.get`
+1. **Missing `PINECONE_API_KEY`** ' Exported in venv activation script
+2. **Chunk file not found** ' Copied to `data/chunks.jsonl`
+3. **Pinecone rejected `null` metadata** ' Metadata sanitization function
+4. **`IndexModel` not JSON serializable** ' Used `.to_dict()` + fallback extraction
+5. **Pinecone response format variation** ' Normalized with `getattr` + `dict.get`
 
 **Critical Decision**: Implemented deterministic embeddings for offline development (no API calls)
 
 ---
 
-### Day 5  RAG PoC: Query Pipeline + UI
+### Day 5  RAG PoC: Query Pipeline + UI
 **Goal**: Implement end-to-end query pipeline and UI
 
 #### Phase 1: LLM Orchestration
 
 **Completed**:
--  Created `src/orchestrator.py` for unified pipeline logic
--  Implemented provider-priority stack: Gemini ’ Groq ’ OpenRouter ’ fallback
--  Built citation extraction logic (regex-based `ID:<chunk_id>`)
--  Mapped citations to retrieved chunk metadata
--  Created minimal Streamlit interface (`ui/app.py`)
--  Validated end-to-end MVP flow (CLI + UI)
+-  Created `src/orchestrator.py` for unified pipeline logic
+-  Implemented provider-priority stack: Gemini ' Groq ' OpenRouter ' fallback
+-  Built citation extraction logic (regex-based `ID:<chunk_id>`)
+-  Mapped citations to retrieved chunk metadata
+-  Created minimal Streamlit interface (`ui/app.py`)
+-  Validated end-to-end MVP flow (CLI + UI)
 
 **Key Implementations**:
 ```python
@@ -156,7 +156,7 @@ def orchestrate_query(query, top_k=3):
 
 ```python
 # ui/app.py
-st.title("RAG MVP  Query Interface")
+st.title("RAG MVP  Query Interface")
 query = st.text_input("Enter your question:")
 if st.button("Run Query"):
     result = orchestrate_query(query, top_k=3)
@@ -164,35 +164,35 @@ if st.button("Run Query"):
 ```
 
 **Challenges Solved**:
-1. **Missing/Malformed Gemini Key** ’ Resolved stray backslash, enabled fallback to Groq
-2. **Groq Model Errors** ’ Switched to `llama-3.1-8b-instant`
-3. **Streamlit Import Failures** ’ Dynamic `sys.path.insert(0, ROOT)`
-4. **Duplicate Snippet Handling** ’ Unified snippet extraction, preloaded `_CHUNKS_MAP`
+1. **Missing/Malformed Gemini Key** ' Resolved stray backslash, enabled fallback to Groq
+2. **Groq Model Errors** ' Switched to `llama-3.1-8b-instant`
+3. **Streamlit Import Failures** ' Dynamic `sys.path.insert(0, ROOT)`
+4. **Duplicate Snippet Handling** ' Unified snippet extraction, preloaded `_CHUNKS_MAP`
 
 #### Phase 2: Structural Refactoring
 
 **Completed**:
--  Removed duplicate helper functions from `src/orchestrator.py`
--  Fixed `src/run_ingestion.py` import paths
--  Regenerated `data/chunks.jsonl` with complete text (44 chunks)
--  Refactored core retrieval logic into `retrieval/retriever.py`
--  Externalized Pinecone configuration to `src/config.py`
+-  Removed duplicate helper functions from `src/orchestrator.py`
+-  Fixed `src/run_ingestion.py` import paths
+-  Regenerated `data/chunks.jsonl` with complete text (44 chunks)
+-  Refactored core retrieval logic into `retrieval/retriever.py`
+-  Externalized Pinecone configuration to `src/config.py`
 
 #### Phase 3: Semantic Embeddings Upgrade P
 
 **Completed**:
--  Implemented free semantic embeddings using `sentence-transformers`
--  Model: `all-MiniLM-L6-v2` (384-dim, PyTorch CPU-only)
--  Created new Pinecone index: `rag-semantic-384`
--  Enhanced retrieval module for semantic search (`use_semantic` parameter)
--  Fixed LLM provider fallback cascade
--  Configured all LLM providers with proper models
--  Set default index to `rag-semantic-384`
+-  Implemented free semantic embeddings using `sentence-transformers`
+-  Model: `all-MiniLM-L6-v2` (384-dim, PyTorch CPU-only)
+-  Created new Pinecone index: `rag-semantic-384`
+-  Enhanced retrieval module for semantic search (`use_semantic` parameter)
+-  Fixed LLM provider fallback cascade
+-  Configured all LLM providers with proper models
+-  Set default index to `rag-semantic-384`
 
 **Results**:
-- <¯ **Semantic search accuracy: 100%** (5/5 GDPR queries)
-- <¯ **Hash-based accuracy: 0%** (0/5 GDPR queries)
-- ¡ **Performance**: <200ms embedding generation on CPU
+- <- **Semantic search accuracy: 100%** (5/5 GDPR queries)
+- <- **Hash-based accuracy: 0%** (0/5 GDPR queries)
+- ! **Performance**: <200ms embedding generation on CPU
 
 **Critical Decision**: Switched from hash-based to semantic embeddings (game-changer for accuracy)
 
@@ -204,23 +204,23 @@ pip install torch                  # PyTorch CPU-only
 
 ---
 
-### Day 6  RAG PoC Deployment
+### Day 6  RAG PoC Deployment
 **Goal**: Deploy to production platform
 
 #### Deployment Attempts
 
-**1. Cloud Run** ’ L Blocked by disabled GCP billing
+**1. Cloud Run** ' L Blocked by disabled GCP billing
 
-**2. Streamlit Cloud** ’ L Failed due to:
+**2. Streamlit Cloud** ' L Failed due to:
    - Configuration complexity
    - Dependency version conflicts (Python 3.13.9 incompatibility)
    - Missing package parsing errors
 
-**3. Railway & Render** ’ L Out of Memory (OOM)
+**3. Railway & Render** ' L Out of Memory (OOM)
    - Free tier: 512MB RAM
    - App requires: ~800MB (sentence-transformers: 300MB + PyTorch: 200MB + Streamlit: 200MB)
 
-**4. Hugging Face Spaces** ’  SUCCESS
+**4. Hugging Face Spaces** '  SUCCESS
    - 16GB RAM free tier
    - Docker-based deployment
    - Native ML application support
@@ -228,11 +228,11 @@ pip install torch                  # PyTorch CPU-only
 #### Deployment Implementation
 
 **Created**:
--  `app.py` - Root entry point for HF Spaces
--  `Dockerfile` - Container configuration
--  `start-app.sh` - Startup validation script
--  Updated `requirements.txt` - Simplified dependencies
--  Multi-platform `src/config.py` - Supports st.secrets + env vars
+-  `app.py` - Root entry point for HF Spaces
+-  `Dockerfile` - Container configuration
+-  `start-app.sh` - Startup validation script
+-  Updated `requirements.txt` - Simplified dependencies
+-  Multi-platform `src/config.py` - Supports st.secrets + env vars
 
 **Key Files**:
 ```dockerfile
@@ -259,10 +259,10 @@ exec streamlit run app.py --server.port=7860
 ```
 
 **Deployment Testing**:
--  Live at https://huggingface.co/spaces/vn6295337/rag-poc
--  End-to-end query testing validated
--  Cold start: ~30-60s, Warm queries: ~5-10s
--  Multi-provider LLM cascade verified (Gemini primary)
+-  Live at https://huggingface.co/spaces/vn6295337/rag-poc
+-  End-to-end query testing validated
+-  Cold start: ~30-60s, Warm queries: ~5-10s
+-  Multi-provider LLM cascade verified (Gemini primary)
 
 **Dependencies Fixed**:
 - Added `python-dotenv` (missing dependency)
@@ -273,21 +273,21 @@ exec streamlit run app.py --server.port=7860
 
 ---
 
-### Day 7  RAG PoC Demo & README
+### Day 7  RAG PoC Demo & README
 **Goal**: Complete documentation and demo recording
 
 **Completed**:
--  Recorded 30-90 sec demo video (demo.mp4)
--  Comprehensive README (360+ lines)
+-  Recorded 30-90 sec demo video (demo.mp4)
+-  Comprehensive README (360+ lines)
   - Elevator pitch
   - Architecture diagrams
   - Quick-start guide (5 minutes)
   - Deployment comparison table
   - Performance metrics
   - Lessons learned
--  Live demo URL with badges
--  GitHub repository links
--  Demo video embedded in README
+-  Live demo URL with badges
+-  GitHub repository links
+-  Demo video embedded in README
 
 **README Highlights**:
 ```markdown
@@ -322,7 +322,7 @@ git push origin main
 | **Memory** | 0MB | ~300MB |
 | **Setup** | Simple (stdlib only) | Medium (pip install) |
 
-**Verdict**:  Semantic embeddings
+**Verdict**:  Semantic embeddings
 - **Why**: Accuracy improvement justifies ~300MB memory cost
 - **Trade-off**: Acceptable 200ms latency for 100% accuracy gain
 
@@ -338,17 +338,17 @@ return embedding.tolist()  # 384 dimensions
 
 ### 2. Why Multi-Provider LLM Cascade
 
-**Decision**: Implement Gemini ’ Groq ’ OpenRouter ’ Local fallback
+**Decision**: Implement Gemini ' Groq ' OpenRouter ' Local fallback
 
 **Rationale**:
 1. **API Reliability**: Any provider can fail (network, rate limits, outages)
 2. **Cost Optimization**: All free-tier providers
-3. **Quality Fallback**: Gemini (best) ’ Groq (fast) ’ OpenRouter (free)
+3. **Quality Fallback**: Gemini (best) ' Groq (fast) ' OpenRouter (free)
 4. **Graceful Degradation**: Local fallback ensures no hard failures
 
 **Real-World Impact**:
-- Day 5: Gemini key malformed ’ Groq fallback worked seamlessly
-- Day 6: Deployment testing ’ Provider cascade validated
+- Day 5: Gemini key malformed ' Groq fallback worked seamlessly
+- Day 6: Deployment testing ' Provider cascade validated
 
 **Implementation**:
 ```python
@@ -402,7 +402,7 @@ def call_llm(prompt, context):
 | **Scalability** | Auto | Manual | Limited |
 | **Reliability** | 99.9% SLA | Self-managed | N/A |
 
-**Verdict**:  Pinecone
+**Verdict**:  Pinecone
 - **Why**: Zero ops, free tier, auto-scaling
 - **Trade-off**: Vendor lock-in acceptable for PoC
 
@@ -420,7 +420,7 @@ def call_llm(prompt, context):
 | **Features** | Built-in UI | Manual | Manual |
 | **Deployment** | Native support | Manual | Manual |
 
-**Verdict**:  Streamlit
+**Verdict**:  Streamlit
 - **Why**: Perfect for PoC, rapid iteration
 - **Trade-off**: Limited customization acceptable for demo
 
@@ -462,7 +462,7 @@ Chunk 2 [1000-2200]: "...organizations must... [boundary] ...data protection."
                       50-token overlap
 ```
 
-**Verdict**:  300/50 tokens
+**Verdict**:  300/50 tokens
 - **Why**: Optimal balance of context and efficiency
 - **Trade-off**: 16% storage increase acceptable
 
@@ -488,40 +488,40 @@ Chunk 2 [1000-2200]: "...organizations must... [boundary] ...data protection."
 
 ```
 poc-rag/
-   app.py                    # HF Spaces entry point
-   ui/app.py                 # Local development UI
-   src/
-      config.py             # Multi-platform configuration P
-      orchestrator.py       # RAG pipeline coordination P
-      llm_providers.py      # Multi-provider LLM interface P
-   ingestion/
-      load_docs.py          # Document loader
-      chunker.py            # Text chunking
-      embeddings.py         # Embedding generation P
-      save_embeddings.py    # Pinecone upsert
-      search_local.py       # Local similarity search
-      cli_ingest.py         # CLI ingestion tool
-   retrieval/
-      retriever.py          # Semantic search P
-      test_retrieval.py     # Retrieval testing
-   scripts/
-      regenerate_with_semantic.py  # Batch re-embedding
-   data/
-      chunks.jsonl          # Original hash-based chunks
-      chunks_semantic.jsonl # Semantic embeddings P
-   sample_docs/              # GDPR markdown files
-   docs/                     # Documentation
-      architecture.md       # System architecture
-      implement.md          # This file
-      run.md                # Operations runbook
-      test_results.md       # End-to-end test results
-      demo.mp4              # Demo video
-   Dockerfile                # Container config
-   start-app.sh              # Startup script
-   requirements.txt          # Python dependencies
-   .env.example              # Environment template
-   .gitignore                # Git exclusions
-   README.md                 # Project overview
+ app.py                    # HF Spaces entry point
+ ui/app.py                 # Local development UI
+ src/
+    config.py             # Multi-platform configuration P
+    orchestrator.py       # RAG pipeline coordination P
+    llm_providers.py      # Multi-provider LLM interface P
+ ingestion/
+    load_docs.py          # Document loader
+    chunker.py            # Text chunking
+    embeddings.py         # Embedding generation P
+    save_embeddings.py    # Pinecone upsert
+    search_local.py       # Local similarity search
+    cli_ingest.py         # CLI ingestion tool
+ retrieval/
+    retriever.py          # Semantic search P
+    test_retrieval.py     # Retrieval testing
+ scripts/
+    regenerate_with_semantic.py  # Batch re-embedding
+ data/
+    chunks.jsonl          # Original hash-based chunks
+    chunks_semantic.jsonl # Semantic embeddings P
+ sample_docs/              # GDPR markdown files
+ docs/                     # Documentation
+    architecture.md       # System architecture
+    implement.md          # This file
+    run.md                # Operations runbook
+    test_results.md       # End-to-end test results
+    demo.mp4              # Demo video
+ Dockerfile                # Container config
+ start-app.sh              # Startup script
+ requirements.txt          # Python dependencies
+ .env.example              # Environment template
+ .gitignore                # Git exclusions
+ README.md                 # Project overview
 ```
 
 **P = Critical files** (core RAG logic)
@@ -558,9 +558,9 @@ def get_embedding(text, provider="local", dim=128, model_name=None):
 ```
 
 **Benefits**:
--  Easy to add new providers
--  Testing with mock providers
--  Runtime provider switching
+-  Easy to add new providers
+-  Testing with mock providers
+-  Runtime provider switching
 
 #### 2. Lazy Loading & Caching
 
@@ -579,8 +579,8 @@ def _get_sentence_transformer_model(model_name):
 ```
 
 **Benefits**:
-- ¡ Fast startup (no upfront model loading)
-- =¾ Memory efficient (single model instance)
+- ! Fast startup (no upfront model loading)
+- =3/4 Memory efficient (single model instance)
 - =' Testable (can clear cache between tests)
 
 #### 3. Graceful Degradation
@@ -600,9 +600,9 @@ def _http_post(url, headers, payload, timeout=30):
 ```
 
 **Benefits**:
--  Works even without `requests` library
--  Minimal dependencies
--  Predictable behavior
+-  Works even without `requests` library
+-  Minimal dependencies
+-  Predictable behavior
 
 #### 4. Metadata Normalization
 
@@ -619,9 +619,9 @@ for m in matches:
 ```
 
 **Benefits**:
--  Works across API versions
--  Resilient to schema changes
--  No hard failures on format changes
+-  Works across API versions
+-  Resilient to schema changes
+-  No hard failures on format changes
 
 ---
 
@@ -837,7 +837,7 @@ pinecone
 #### Day 6 (Deployment): Simplified
 ```
 # Changed: Removed exact version pins
-streamlit==1.52.0 ’ streamlit>=1.40.0
+streamlit==1.52.0 ' streamlit>=1.40.0
 # Reason: Python 3.13 compatibility issues
 ```
 
@@ -1073,8 +1073,8 @@ streamlit run ui/app.py
 ### 1. Free Tier Constraints Matter
 
 **Finding**: ML apps need >512MB RAM
-- Render/Railway free tier: 512MB ’ OOM
-- HF Spaces free tier: 16GB ’ Works perfectly
+- Render/Railway free tier: 512MB ' OOM
+- HF Spaces free tier: 16GB ' Works perfectly
 
 **Lesson**: Research platform limits before deployment
 
@@ -1093,8 +1093,8 @@ streamlit run ui/app.py
 ### 3. Multi-Provider Fallback Essential
 
 **Finding**: API failures are common
-- Day 5: Gemini key malformed ’ Groq saved us
-- Day 6: Rate limits expected ’ Cascade handles it
+- Day 5: Gemini key malformed ' Groq saved us
+- Day 6: Rate limits expected ' Cascade handles it
 
 **Lesson**: Always implement at least 2 provider options
 
@@ -1224,14 +1224,14 @@ if [ -z "$PINECONE_API_KEY" ]; then
 fi
 ```
 
-**Fix**: Add secrets via HF Spaces UI (Settings ’ Repository Secrets)
+**Fix**: Add secrets via HF Spaces UI (Settings ' Repository Secrets)
 
 ---
 
 ## Next Steps
 
 ### Immediate Improvements
-1.  Complete deep documentation (Day 8)
+1.  Complete deep documentation (Day 8)
 2. [ ] Fix MAX_TOKENS handling in `src/llm_providers.py`
 3. [ ] Add metadata tracking to `src/orchestrator.py`
 4. [ ] Increase `max_tokens` parameter in Gemini config
