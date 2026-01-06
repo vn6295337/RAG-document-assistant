@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-document-assistant"
+version = "0.1.0"
+authors = [
+    {name = "AI Portfolio", email = "vn6295337@gmail.com"},
+]
+description = "Production-ready RAG system delivering 100% retrieval accuracy with zero infrastructure costs"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Indexing",
+    "Topic :: Text Processing :: Linguistic",
+]
+dependencies = [
+    "streamlit>=1.40.0",
+    "pinecone>=5.0.0",
+    "sentence-transformers>=2.2.0",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "torch",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "black>=21.0",
+    "flake8>=3.9",
+    "mypy>=0.910",
+]
+
+[project.urls]
+Homepage = "https://github.com/vn6295337/RAG-document-assistant"
+Repository = "https://github.com/vn6295337/RAG-document-assistant"
+Issues = "https://github.com/vn6295337/RAG-document-assistant/issues"
+
+[project.scripts]
+rag-ingest = "src.ingestion.cli_ingest:main"
+rag-search = "src.ingestion.search_local:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''

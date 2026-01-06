@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+.env.local
+venv/
+.venv/
+.env.*
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+.obsidian/
+
+# System
+*.log
+
+# Data (embeddings, large files - can be regenerated)
+data/
+sample_docs/
+
+# Secrets
+secrets/
+*.key
+
+# Node
+node_modules/
+dist/
+
+# Misc
+*.bak
