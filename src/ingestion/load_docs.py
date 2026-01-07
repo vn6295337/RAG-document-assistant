@@ -1,13 +1,13 @@
 # RAG-document-assistant/ingestion/load_docs.py
 """
-Simple markdown document loader for Day-3 ingestion step.
+Document loader for RAG ingestion.
 
-Functions:
-- load_markdown_docs(dir_path, ext='.md', max_chars=20000)
-  -> returns list of dicts: { "filename", "path", "text", "chars", "words" }
+Provides:
+- load_markdown_docs(): Legacy markdown-only loader
+- load_documents(): Unified loader (uses Docling if available, falls back to markdown)
 
 CLI:
-> python3 load_docs.py /full/path/to/your/markdown/folder
+> python3 load_docs.py /full/path/to/your/docs/folder
 prints a summary table for each file and exits with code 0.
 """
 
@@ -15,7 +15,10 @@ import os
 import glob
 import argparse
 import re
-from typing import List, Dict
+import logging
+from typing import List, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 def _clean_markdown(text: str) -> str:
     """
@@ -128,12 +131,97 @@ def print_summary(docs: List[Dict]):
     print("-" * 80)
     print(f"Total files: {len(docs)}  OK: {ok_count}  Skipped: {skipped}")
 
+# Try to import Docling loader
+DOCLING_AVAILABLE = False
+try:
+    from src.ingestion.docling_loader import (
+        load_documents_with_docling,
+        convert_to_legacy_format,
+        print_summary as docling_print_summary,
+        SUPPORTED_EXTENSIONS
+    )
+    DOCLING_AVAILABLE = True
+except ImportError:
+    SUPPORTED_EXTENSIONS = {".md", ".markdown"}
+
+
+def load_documents(
+    dir_path: str,
+    extensions: Optional[List[str]] = None,
+    max_chars: int = 50000,
+    use_docling: bool = True,
+    recursive: bool = False
+) -> List[Dict]:
+    """
+    Unified document loader - uses Docling if available, falls back to markdown.
+
+    Args:
+        dir_path: Path to directory containing documents
+        extensions: File extensions to process (None = all supported)
+        max_chars: Maximum characters per document
+        use_docling: Prefer Docling if available
+        recursive: Search subdirectories
+
+    Returns:
+        List of document dicts with text and metadata
+    """
+    if use_docling and DOCLING_AVAILABLE:
+        logger.info("Using Docling multi-format loader")
+        parsed = load_documents_with_docling(
+            dir_path,
+            extensions=extensions,
+            max_chars=max_chars,
+            recursive=recursive
+        )
+        return convert_to_legacy_format(parsed)
+    else:
+        logger.info("Using legacy markdown loader")
+        ext = ".md"
+        if extensions and len(extensions) > 0:
+            ext = extensions[0] if extensions[0].startswith(".") else f".{extensions[0]}"
+        return load_markdown_docs(dir_path, ext=ext, max_chars=max_chars)
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Load and summarize markdown docs for RAG ingestion.")
-    parser.add_argument("dir", help="Directory containing markdown (.md) files")
-    parser.add_argument("--ext", default=".md", help="File extension to load")
-    parser.add_argument("--max-chars", type=int, default=20000, help="Max cleaned characters to accept (default 20k)")
+    parser = argparse.ArgumentParser(
+        description="Load and summarize documents for RAG ingestion."
+    )
+    parser.add_argument("dir", help="Directory containing documents")
+    parser.add_argument(
+        "--ext", "-e",
+        nargs="+",
+        default=None,
+        help="File extensions to load (default: all supported)"
+    )
+    parser.add_argument(
+        "--max-chars",
+        type=int,
+        default=50000,
+        help="Max characters to accept (default 50k)"
+    )
+    parser.add_argument(
+        "--no-docling",
+        action="store_true",
+        help="Disable Docling, use markdown-only loader"
+    )
+    parser.add_argument(
+        "--recursive", "-r",
+        action="store_true",
+        help="Search subdirectories"
+    )
     args = parser.parse_args()
 
-    docs = load_markdown_docs(args.dir, ext=args.ext, max_chars=args.max_chars)
-    print_summary(docs)
+    if args.no_docling or not DOCLING_AVAILABLE:
+        # Legacy markdown mode
+        ext = args.ext[0] if args.ext else ".md"
+        docs = load_markdown_docs(args.dir, ext=ext, max_chars=args.max_chars)
+        print_summary(docs)
+    else:
+        # Docling multi-format mode
+        parsed = load_documents_with_docling(
+            args.dir,
+            extensions=args.ext,
+            max_chars=args.max_chars,
+            recursive=args.recursive
+        )
+        docling_print_summary(parsed)

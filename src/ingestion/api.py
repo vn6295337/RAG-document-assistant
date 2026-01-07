@@ -3,17 +3,36 @@ Ingestion API for UI integration.
 
 Provides functions to ingest documents from a directory
 and optionally sync to Pinecone.
+
+Supports both legacy markdown-only loading and multi-format
+loading via Docling.
 """
 
 import json
 import os
+import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 
 from src.ingestion.load_docs import load_markdown_docs
-from src.ingestion.chunker import chunk_documents
+from src.ingestion.chunker import chunk_documents, chunk_documents_with_structure
 from src.ingestion.embeddings import batch_embed_chunks
+
+logger = logging.getLogger(__name__)
+
+# Try to import Docling loader (optional dependency)
+DOCLING_AVAILABLE = False
+try:
+    from src.ingestion.docling_loader import (
+        load_documents_with_docling,
+        convert_to_legacy_format,
+        SUPPORTED_EXTENSIONS
+    )
+    DOCLING_AVAILABLE = True
+except ImportError:
+    logger.info("Docling not available, using markdown-only loader")
+    SUPPORTED_EXTENSIONS = {".md", ".markdown"}
 
 
 @dataclass
@@ -38,7 +57,11 @@ def ingest_from_directory(
     docs_dir: str,
     output_path: str = "data/chunks.jsonl",
     provider: str = "sentence-transformers",
-    dim: int = 384
+    dim: int = 384,
+    use_docling: bool = True,
+    extensions: Optional[List[str]] = None,
+    use_structure: bool = True,
+    recursive: bool = False
 ) -> IngestionResult:
     """
     Ingest documents from a directory and save to chunks.jsonl.
@@ -48,6 +71,10 @@ def ingest_from_directory(
         output_path: Path to save chunks.jsonl
         provider: Embedding provider ("sentence-transformers" or "local")
         dim: Embedding dimension
+        use_docling: Use Docling for multi-format parsing (if available)
+        extensions: File extensions to process (None = all supported)
+        use_structure: Use structure-aware chunking (requires Docling)
+        recursive: Search subdirectories recursively
 
     Returns:
         IngestionResult with status and counts
@@ -65,8 +92,20 @@ def ingest_from_directory(
         )
 
     try:
-        # Load documents
-        docs = load_markdown_docs(docs_dir)
+        # Choose loader based on availability and preference
+        if use_docling and DOCLING_AVAILABLE:
+            logger.info("Using Docling for multi-format document loading")
+            parsed_docs = load_documents_with_docling(
+                docs_dir,
+                extensions=extensions,
+                recursive=recursive
+            )
+            docs = convert_to_legacy_format(parsed_docs)
+        else:
+            logger.info("Using legacy markdown loader")
+            docs = load_markdown_docs(docs_dir)
+            use_structure = False  # No structure without Docling
+
         if not docs:
             return IngestionResult(
                 status="warning",
@@ -77,10 +116,19 @@ def ingest_from_directory(
             )
 
         # Count successful loads
-        doc_count = len([d for d in docs if d.get("status") == "ok"])
+        doc_count = len([d for d in docs if d.get("status") == "OK"])
 
-        # Chunk documents
-        chunks = chunk_documents(docs, max_tokens=300, overlap=50)
+        # Chunk documents (structure-aware or legacy)
+        if use_structure and DOCLING_AVAILABLE:
+            chunks = chunk_documents_with_structure(
+                docs,
+                max_tokens=300,
+                overlap=50,
+                use_structure=True
+            )
+        else:
+            chunks = chunk_documents(docs, max_tokens=300, overlap=50)
+
         if not chunks:
             return IngestionResult(
                 status="warning",
@@ -93,12 +141,15 @@ def ingest_from_directory(
         # Generate embeddings
         embedded = batch_embed_chunks(chunks, provider=provider, dim=dim)
 
-        # Merge text back into embedded chunks
-        chunk_map = {(c["filename"], c["chunk_id"]): c["text"] for c in chunks}
+        # Merge text and metadata back into embedded chunks
+        chunk_map = {(c["filename"], c["chunk_id"]): c for c in chunks}
         for e in embedded:
             key = (e["filename"], e["chunk_id"])
             if key in chunk_map:
-                e["text"] = chunk_map[key]
+                src = chunk_map[key]
+                e["text"] = src.get("text", "")
+                e["element_type"] = src.get("element_type", "text")
+                e["section_heading"] = src.get("section_heading", "")
 
         # Save to file
         save_path = Path(output_path)
@@ -112,6 +163,8 @@ def ingest_from_directory(
                     "chunk_id": e["chunk_id"],
                     "text": e.get("text", ""),
                     "chars": e.get("chars", 0),
+                    "element_type": e.get("element_type", "text"),
+                    "section_heading": e.get("section_heading", ""),
                     "embedding": e["embedding"]
                 }
                 fh.write(json.dumps(obj, ensure_ascii=False) + "\n")
@@ -125,6 +178,7 @@ def ingest_from_directory(
         )
 
     except Exception as e:
+        logger.exception("Ingestion failed")
         return IngestionResult(
             status="error",
             documents=0,
@@ -237,6 +291,20 @@ def sync_to_pinecone(
             vectors_upserted=0,
             errors=[str(e)]
         )
+
+
+def get_supported_formats() -> Dict[str, Any]:
+    """
+    Get information about supported document formats.
+
+    Returns:
+        Dict with docling availability and supported extensions
+    """
+    return {
+        "docling_available": DOCLING_AVAILABLE,
+        "supported_extensions": list(SUPPORTED_EXTENSIONS),
+        "loader": "docling" if DOCLING_AVAILABLE else "markdown-only"
+    }
 
 
 def get_index_status(chunks_path: str = "data/chunks.jsonl") -> Dict[str, Any]:
