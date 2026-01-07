@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { embedChunks, clearIndex } from '../api/client';
+import { embedChunks, clearIndex, parseWithDocling } from '../api/client';
 import { processSelectedFiles } from '../api/dropbox';
 import { chunkFiles } from '../api/chunker';
 import ProcessingStatus from './ProcessingStatus';
 import IndexSummary from './IndexSummary';
 import CloudConnect from './CloudConnect';
-import ParsingEval from './ParsingEval';
+import DoclingOutput from './DoclingOutput';
 
 export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
   const [loading, setLoading] = useState(false);
@@ -17,8 +17,9 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
   const [stagedFiles, setStagedFiles] = useState([]);
   const [accessToken, setAccessToken] = useState(null);
 
-  // State for parsing evaluation
-  const [evalFile, setEvalFile] = useState(null);
+  // State for Docling parsing output
+  const [parsedDocuments, setParsedDocuments] = useState(null);
+  const [pendingFileContents, setPendingFileContents] = useState(null);
 
   // Handle files staged from CloudConnect (not processed yet)
   const handleFilesStaged = (files) => {
@@ -46,7 +47,7 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
     setStagedFiles([]);
   };
 
-  // Start indexing the staged files
+  // Start indexing the staged files - Phase 1: Read and Parse
   const handleIndexFiles = async () => {
     if (stagedFiles.length === 0 || !accessToken) return;
 
@@ -62,7 +63,7 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
         setProcessingState({
           step: 'read',
           fileName: progress.fileName,
-          progress: 10 + (progress.current / progress.total) * 20,
+          progress: 10 + (progress.current / progress.total) * 15,
         });
       });
 
@@ -73,26 +74,66 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
         return;
       }
 
-      // Step 2: Chunk files (client-side)
-      setProcessingState({ step: 'chunk', fileName: `${fileContents.length} files`, progress: 35 });
+      // Step 2: Parse with Docling
+      setProcessingState({ step: 'parse', fileName: `${fileContents.length} files`, progress: 28 });
+
+      const parseResult = await parseWithDocling(
+        stagedFiles.map(f => ({ path: f.path_lower, name: f.name })),
+        accessToken
+      );
+
+      if (parseResult.error) {
+        setMessage({ type: 'error', text: parseResult.error });
+        setLoading(false);
+        setProcessingState(null);
+        return;
+      }
+
+      // Store results and pause for user review
+      setParsedDocuments(parseResult.results);
+      setPendingFileContents(fileContents);
+      setProcessingState(null);
+      setLoading(false);
+      // User will click "Continue to Indexing" in DoclingOutput
+
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
+      setProcessingState(null);
+      setLoading(false);
+    }
+  };
+
+  // Continue indexing after user reviews Docling output
+  const handleContinueIndexing = async () => {
+    if (!pendingFileContents) return;
+
+    setLoading(true);
+    setParsedDocuments(null);
+
+    try {
+      const fileContents = pendingFileContents;
+      setPendingFileContents(null);
+
+      // Step 3: Chunk files (client-side)
+      setProcessingState({ step: 'chunk', fileName: `${fileContents.length} files`, progress: 40 });
       await new Promise(r => setTimeout(r, 100));
 
       const chunks = chunkFiles(fileContents);
 
-      // Step 3: Clear existing index
+      // Step 4: Clear existing index
       setProcessingState({ step: 'clear', fileName: 'Clearing old data', progress: 50 });
       await clearIndex();
 
-      // Step 4: Send chunks to server for embedding
+      // Step 5: Send chunks to server for embedding
       setProcessingState({ step: 'embed', fileName: `${chunks.length} chunks`, progress: 65 });
 
       const result = await embedChunks(chunks);
 
-      // Step 5: Show discard step
+      // Step 6: Show discard step
       setProcessingState({ step: 'discard', fileName: '', progress: 85 });
       await new Promise(r => setTimeout(r, 300));
 
-      // Step 6: Complete
+      // Step 7: Complete
       setProcessingState({ step: 'save', fileName: '', progress: 100 });
       await new Promise(r => setTimeout(r, 200));
 
@@ -185,29 +226,16 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
                     <p className="text-xs text-slate-500">{formatSize(file.size)}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                  <button
-                    type="button"
-                    onClick={() => setEvalFile(file)}
-                    className="p-1 text-slate-500 hover:text-blue-400"
-                    aria-label={`Test parsing ${file.name}`}
-                    title="Test Docling Parsing"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(file.id)}
-                    className="p-1 text-slate-500 hover:text-red-400"
-                    aria-label={`Remove ${file.name}`}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => removeFile(file.id)}
+                  className="p-1 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                  aria-label={`Remove ${file.name}`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
             ))}
           </div>
@@ -250,12 +278,12 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
         </div>
       )}
 
-      {/* Parsing Evaluation Modal */}
-      {evalFile && (
-        <ParsingEval
-          file={evalFile}
-          accessToken={accessToken}
-          onClose={() => setEvalFile(null)}
+      {/* Docling Output Modal */}
+      {parsedDocuments && (
+        <DoclingOutput
+          results={parsedDocuments}
+          onContinue={handleContinueIndexing}
+          onDownload={() => {}}
         />
       )}
     </div>

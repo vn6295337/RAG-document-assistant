@@ -125,3 +125,16 @@ export async function getSupportedFormats() {
   const res = await fetch(`${API_BASE}/eval/formats`);
   return res.json();
 }
+
+/**
+ * Parse files with Docling and return COMPLETE output
+ * Returns all elements (not just samples) for full document preview
+ */
+export async function parseWithDocling(files, accessToken) {
+  const res = await fetch(`${API_BASE}/parse-docling`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files, access_token: accessToken })
+  });
+  return res.json();
+}

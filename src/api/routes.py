@@ -537,6 +537,113 @@ async def eval_formats():
     return get_supported_formats()
 
 
+@router.post("/parse-docling")
+async def parse_docling(request: dict):
+    """
+    Parse files with Docling and return COMPLETE output.
+
+    Request:
+        - files: Array of {path, name} objects
+        - access_token: Dropbox access token
+
+    Returns array of parsed documents with ALL elements (not samples).
+    """
+    import tempfile
+    import os
+    from pathlib import Path
+    from collections import Counter
+
+    files = request.get("files", [])
+    access_token = request.get("access_token")
+
+    if not access_token or not files:
+        return {"error": "Missing files or access_token"}
+
+    results = []
+
+    for file_info in files:
+        file_path = file_info.get("path")
+        file_name = file_info.get("name", Path(file_path).name if file_path else "unknown")
+
+        if not file_path:
+            results.append({
+                "filename": file_name,
+                "status": "ERROR",
+                "error": "Missing file path"
+            })
+            continue
+
+        try:
+            # Download file from Dropbox
+            async with httpx.AsyncClient(timeout=180.0) as client:
+                response = await client.post(
+                    "https://content.dropboxapi.com/2/files/download",
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Dropbox-API-Arg": f'{{"path": "{file_path}"}}'
+                    }
+                )
+
+                if response.status_code != 200:
+                    results.append({
+                        "filename": file_name,
+                        "status": "ERROR",
+                        "error": f"Dropbox download failed: {response.text}"
+                    })
+                    continue
+
+            # Save to temp file
+            suffix = Path(file_name).suffix or Path(file_path).suffix
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(response.content)
+                tmp_path = tmp.name
+
+            try:
+                from src.ingestion.docling_loader import load_document_with_docling
+
+                doc = load_document_with_docling(tmp_path)
+
+                # Count element types
+                type_counts = Counter(el.element_type for el in doc.elements)
+
+                # Return ALL elements (not just samples)
+                all_elements = []
+                for el in doc.elements:
+                    all_elements.append({
+                        "type": el.element_type,
+                        "text": el.text,
+                        "level": el.level,
+                        "page": getattr(el, 'page', None),
+                        "metadata": getattr(el, 'metadata', {})
+                    })
+
+                results.append({
+                    "filename": file_name,
+                    "path": file_path,
+                    "status": doc.status,
+                    "format": doc.format,
+                    "total_elements": len(doc.elements),
+                    "total_chars": doc.chars,
+                    "total_words": doc.words,
+                    "page_count": doc.page_count,
+                    "element_types": dict(type_counts),
+                    "elements": all_elements,
+                    "error": doc.error
+                })
+
+            finally:
+                os.unlink(tmp_path)
+
+        except Exception as e:
+            results.append({
+                "filename": file_name,
+                "status": "ERROR",
+                "error": str(e)
+            })
+
+    return {"results": results}
+
+
 @router.post("/dropbox/file")
 async def dropbox_file(request: dict):
     """

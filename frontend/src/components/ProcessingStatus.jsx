@@ -1,5 +1,6 @@
 const steps = [
   { id: 'read', label: 'Reading from cloud storage' },
+  { id: 'parse', label: 'Parsing with Docling' },
   { id: 'chunk', label: 'Chunking in your browser' },
   { id: 'clear', label: 'Clearing old index data' },
   { id: 'embed', label: 'Generating embeddings' },
