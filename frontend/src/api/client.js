@@ -104,3 +104,24 @@ export async function getDropboxFile(filePath, accessToken) {
   });
   return res.json();
 }
+
+/**
+ * Evaluate Docling parsing on a Dropbox file
+ * Returns element breakdown and parsing metrics
+ */
+export async function evalParsing(filePath, accessToken) {
+  const res = await fetch(`${API_BASE}/eval/parsing`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: filePath, access_token: accessToken })
+  });
+  return res.json();
+}
+
+/**
+ * Get supported document formats for Docling parsing
+ */
+export async function getSupportedFormats() {
+  const res = await fetch(`${API_BASE}/eval/formats`);
+  return res.json();
+}

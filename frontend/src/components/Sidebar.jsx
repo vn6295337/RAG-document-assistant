@@ -5,6 +5,7 @@ import { chunkFiles } from '../api/chunker';
 import ProcessingStatus from './ProcessingStatus';
 import IndexSummary from './IndexSummary';
 import CloudConnect from './CloudConnect';
+import ParsingEval from './ParsingEval';
 
 export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
   const [loading, setLoading] = useState(false);
@@ -15,6 +16,9 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
   // New state for two-step flow
   const [stagedFiles, setStagedFiles] = useState([]);
   const [accessToken, setAccessToken] = useState(null);
+
+  // State for parsing evaluation
+  const [evalFile, setEvalFile] = useState(null);
 
   // Handle files staged from CloudConnect (not processed yet)
   const handleFilesStaged = (files) => {
@@ -181,16 +185,29 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
                     <p className="text-xs text-slate-500">{formatSize(file.size)}</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeFile(file.id)}
-                  className="p-1 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                  aria-label={`Remove ${file.name}`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <button
+                    type="button"
+                    onClick={() => setEvalFile(file)}
+                    className="p-1 text-slate-500 hover:text-blue-400"
+                    aria-label={`Test parsing ${file.name}`}
+                    title="Test Docling Parsing"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(file.id)}
+                    className="p-1 text-slate-500 hover:text-red-400"
+                    aria-label={`Remove ${file.name}`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -233,6 +250,14 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
         </div>
       )}
 
+      {/* Parsing Evaluation Modal */}
+      {evalFile && (
+        <ParsingEval
+          file={evalFile}
+          accessToken={accessToken}
+          onClose={() => setEvalFile(null)}
+        />
+      )}
     </div>
   );
 }

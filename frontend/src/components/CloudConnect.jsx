@@ -4,9 +4,9 @@ import { exchangeDropboxCode, getDropboxFolder } from '../api/client';
 const DROPBOX_APP_KEY = import.meta.env.VITE_DROPBOX_APP_KEY;
 const REDIRECT_URI = window.location.origin;
 
-// Supported file extensions
-const SUPPORTED_EXTENSIONS = ['.txt', '.md', '.pdf'];
-const MAX_FILE_SIZE_MB = 5;
+// Supported file extensions (Docling supports many formats)
+const SUPPORTED_EXTENSIONS = ['.txt', '.md', '.pdf', '.docx', '.pptx', '.xlsx', '.html', '.htm', '.jpg', '.jpeg', '.png', '.bmp', '.tiff'];
+const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 export default function CloudConnect({ onFilesStaged, stagedFiles = [], onAccessTokenChange }) {
@@ -269,7 +269,7 @@ export default function CloudConnect({ onFilesStaged, stagedFiles = [], onAccess
             Connect Dropbox
           </button>
           <p className="text-xs text-slate-500 text-center">
-            Supports {SUPPORTED_EXTENSIONS.join(', ')} (max {MAX_FILE_SIZE_MB} MB)
+            PDF, DOCX, PPTX, XLSX, HTML, images (max {MAX_FILE_SIZE_MB} MB)
           </p>
         </div>
       ) : (
@@ -306,7 +306,7 @@ export default function CloudConnect({ onFilesStaged, stagedFiles = [], onAccess
 
           {/* File type hints */}
           <p className="text-xs text-slate-500 text-center">
-            Supports {SUPPORTED_EXTENSIONS.join(', ')} (max {MAX_FILE_SIZE_MB} MB)
+            PDF, DOCX, PPTX, XLSX, HTML, images (max {MAX_FILE_SIZE_MB} MB)
           </p>
         </div>
       )}
