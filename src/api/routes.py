@@ -447,6 +447,96 @@ async def dropbox_folder(request: dict):
         return {"error": str(e)}
 
 
+@router.post("/eval/parsing")
+async def eval_parsing(request: dict):
+    """
+    Evaluate Docling parsing on a file from Dropbox.
+
+    Request:
+        - path: Dropbox file path
+        - access_token: Dropbox access token
+
+    Returns parsing metrics and element breakdown.
+    """
+    import tempfile
+    from pathlib import Path
+
+    file_path = request.get("path")
+    access_token = request.get("access_token")
+
+    if not access_token or not file_path:
+        return {"error": "Missing path or access_token"}
+
+    try:
+        # Download file from Dropbox
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                "https://content.dropboxapi.com/2/files/download",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Dropbox-API-Arg": f'{{"path": "{file_path}"}}'
+                }
+            )
+
+            if response.status_code != 200:
+                return {"error": f"Dropbox download failed: {response.text}"}
+
+        # Save to temp file
+        filename = Path(file_path).name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as tmp:
+            tmp.write(response.content)
+            tmp_path = tmp.name
+
+        # Run Docling parsing
+        try:
+            from src.ingestion.docling_loader import load_document_with_docling
+            from collections import Counter
+
+            doc = load_document_with_docling(tmp_path)
+
+            # Count element types
+            type_counts = Counter(el.element_type for el in doc.elements)
+
+            # Sample elements
+            samples = []
+            for el in doc.elements[:10]:
+                samples.append({
+                    "type": el.element_type,
+                    "text": el.text[:200] + "..." if len(el.text) > 200 else el.text,
+                    "level": el.level
+                })
+
+            result = {
+                "status": doc.status,
+                "filename": doc.filename,
+                "format": doc.format,
+                "total_elements": len(doc.elements),
+                "total_chars": doc.chars,
+                "total_words": doc.words,
+                "page_count": doc.page_count,
+                "element_types": dict(type_counts),
+                "sample_elements": samples,
+                "error": doc.error
+            }
+
+        finally:
+            # Clean up temp file
+            import os
+            os.unlink(tmp_path)
+
+        return result
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@router.get("/eval/formats")
+async def eval_formats():
+    """Get supported document formats for Docling parsing."""
+    from src.ingestion.api import get_supported_formats
+    return get_supported_formats()
+
+
 @router.post("/dropbox/file")
 async def dropbox_file(request: dict):
     """
