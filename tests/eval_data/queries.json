@@ -1,0 +1,21 @@
+{
+  "description": "Test queries for retrieval evaluation",
+  "queries": [
+    {
+      "id": "q1",
+      "query": "Example query about your document content",
+      "relevant_chunks": ["document.pdf::0", "document.pdf::1"],
+      "keywords": ["expected", "keywords", "in", "answer"]
+    }
+  ],
+  "similarity_pairs": {
+    "similar": [
+      ["What is the total revenue?", "How much money did we make?"],
+      ["Describe the methodology", "What methods were used?"]
+    ],
+    "dissimilar": [
+      ["What is the revenue?", "Who founded the company?"],
+      ["Technical specifications", "Company history"]
+    ]
+  }
+}
