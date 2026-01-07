@@ -1,7 +1,5 @@
 FROM python:3.11-slim
 
-WORKDIR /app
-
 # Install system dependencies for Docling (PDF, OCR, image processing)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -13,13 +11,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
+# Create user for HF Spaces (runs as user ID 1000)
+RUN useradd -m -u 1000 user
+USER user
+
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
+
+WORKDIR $HOME/app
+
 # Copy requirements and install dependencies
-COPY requirements.txt .
+COPY --chown=user requirements.txt .
 RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY src/ ./src/
+COPY --chown=user src/ ./src/
 
 # Expose port (HF Spaces uses 7860)
 EXPOSE 7860
