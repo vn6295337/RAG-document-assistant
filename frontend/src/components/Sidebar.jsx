@@ -85,10 +85,17 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
       // If no docs have full_text, show detailed error
       if (successfulDocs.length === 0) {
         const errors = parseResult.results
-          .filter(r => r.status !== 'OK' || !r.full_text)
-          .map(r => `${r.filename}: ${r.error || r.status || 'No text extracted'}`)
+          .map(r => {
+            if (r.status !== 'OK') {
+              return `${r.filename}: ${r.error || 'Parse error'}`;
+            } else if (!r.full_text || !r.full_text.trim()) {
+              return `${r.filename}: No text extracted (empty content)`;
+            }
+            return null;
+          })
+          .filter(Boolean)
           .join('; ');
-        setMessage({ type: 'error', text: `Parsing failed: ${errors}` });
+        setMessage({ type: 'error', text: `Parsing failed: ${errors || 'Unknown error'}` });
         setLoading(false);
         setProcessingState(null);
         return;
