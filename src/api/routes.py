@@ -579,44 +579,117 @@ async def parse_docling(request: dict):
                     continue
 
             # Zero-disk processing: parse directly from memory
-            from src.ingestion.docling_loader import load_document_from_bytes
+            # Try Docling first, fallback to PyPDF2 if Docling fails
+            doc = None
+            fallback_text = None
+            parse_method = "docling"
 
-            doc = load_document_from_bytes(response.content, file_name)
+            try:
+                from src.ingestion.docling_loader import load_document_from_bytes
+                doc = load_document_from_bytes(response.content, file_name)
 
-            # Count element types
-            type_counts = Counter(el.element_type for el in doc.elements)
+                # If Docling returned error or no text, try fallback
+                if doc.status != "OK" or not doc.full_text.strip():
+                    raise ValueError(f"Docling parsing failed: {doc.error or 'No text extracted'}")
 
-            # Return ALL elements (not just samples)
-            all_elements = []
-            for el in doc.elements:
-                all_elements.append({
-                    "type": el.element_type,
-                    "text": el.text,
-                    "level": el.level,
-                    "page": getattr(el, 'page', None),
-                    "metadata": getattr(el, 'metadata', {})
+            except Exception as docling_err:
+                # Fallback to PyPDF2 for PDFs, or raw text for others
+                parse_method = "fallback"
+                import io
+
+                ext = Path(file_name).suffix.lower()
+                if ext == ".pdf":
+                    try:
+                        from PyPDF2 import PdfReader
+                        pdf_file = io.BytesIO(response.content)
+                        reader = PdfReader(pdf_file)
+                        text_parts = []
+                        for page in reader.pages:
+                            page_text = page.extract_text()
+                            if page_text:
+                                text_parts.append(page_text)
+                        fallback_text = "\n\n".join(text_parts)
+                    except Exception as pdf_err:
+                        fallback_text = None
+                elif ext in [".txt", ".md", ".markdown"]:
+                    try:
+                        fallback_text = response.content.decode("utf-8")
+                    except Exception:
+                        fallback_text = None
+
+            # Build response based on what worked
+            if doc and doc.status == "OK" and doc.full_text.strip():
+                # Docling succeeded
+                type_counts = Counter(el.element_type for el in doc.elements)
+                all_elements = []
+                for el in doc.elements:
+                    all_elements.append({
+                        "type": el.element_type,
+                        "text": el.text,
+                        "level": el.level,
+                        "page": getattr(el, 'page', None),
+                        "metadata": getattr(el, 'metadata', {})
+                    })
+
+                results.append({
+                    "filename": file_name,
+                    "path": file_path,
+                    "status": "OK",
+                    "format": doc.format,
+                    "total_elements": len(doc.elements),
+                    "total_chars": doc.chars,
+                    "total_words": doc.words,
+                    "page_count": doc.page_count,
+                    "element_types": dict(type_counts),
+                    "elements": all_elements,
+                    "full_text": doc.full_text,
+                    "parse_method": "docling",
+                    "error": None
                 })
-
-            results.append({
-                "filename": file_name,
-                "path": file_path,
-                "status": doc.status,
-                "format": doc.format,
-                "total_elements": len(doc.elements),
-                "total_chars": doc.chars,
-                "total_words": doc.words,
-                "page_count": doc.page_count,
-                "element_types": dict(type_counts),
-                "elements": all_elements,
-                "full_text": doc.full_text,  # For client-side chunking (single-download flow)
-                "error": doc.error
-            })
+            elif fallback_text and fallback_text.strip():
+                # Fallback succeeded
+                results.append({
+                    "filename": file_name,
+                    "path": file_path,
+                    "status": "OK",
+                    "format": Path(file_name).suffix.lower(),
+                    "total_elements": 1,
+                    "total_chars": len(fallback_text),
+                    "total_words": len(fallback_text.split()),
+                    "page_count": 0,
+                    "element_types": {"paragraph": 1},
+                    "elements": [{"type": "paragraph", "text": fallback_text[:500] + "..." if len(fallback_text) > 500 else fallback_text, "level": 0}],
+                    "full_text": fallback_text,
+                    "parse_method": "fallback_pypdf2" if Path(file_name).suffix.lower() == ".pdf" else "fallback_text",
+                    "error": None
+                })
+            else:
+                # Both failed
+                results.append({
+                    "filename": file_name,
+                    "path": file_path,
+                    "status": "ERROR",
+                    "format": Path(file_name).suffix.lower(),
+                    "total_elements": 0,
+                    "total_chars": 0,
+                    "total_words": 0,
+                    "page_count": 0,
+                    "element_types": {},
+                    "elements": [],
+                    "full_text": "",
+                    "parse_method": "failed",
+                    "error": f"Could not extract text from {file_name}"
+                })
 
         except Exception as e:
             results.append({
                 "filename": file_name,
                 "status": "ERROR",
-                "error": str(e)
+                "error": str(e),
+                "full_text": "",  # Empty for consistency
+                "elements": [],
+                "total_elements": 0,
+                "total_chars": 0
             })
 
     return {"results": results}

@@ -69,11 +69,26 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
         return;
       }
 
-      // Filter successful parses
-      const successfulDocs = parseResult.results.filter(r => r.status === 'OK' && r.full_text);
+      // Check if results exist
+      if (!parseResult.results || parseResult.results.length === 0) {
+        setMessage({ type: 'error', text: 'No results returned from parser' });
+        setLoading(false);
+        setProcessingState(null);
+        return;
+      }
 
+      // Filter successful parses - check for non-empty full_text
+      const successfulDocs = parseResult.results.filter(r =>
+        r.status === 'OK' && r.full_text && r.full_text.trim().length > 0
+      );
+
+      // If no docs have full_text, show detailed error
       if (successfulDocs.length === 0) {
-        setMessage({ type: 'error', text: 'No files could be parsed' });
+        const errors = parseResult.results
+          .filter(r => r.status !== 'OK' || !r.full_text)
+          .map(r => `${r.filename}: ${r.error || r.status || 'No text extracted'}`)
+          .join('; ');
+        setMessage({ type: 'error', text: `Parsing failed: ${errors}` });
         setLoading(false);
         setProcessingState(null);
         return;
