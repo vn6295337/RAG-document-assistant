@@ -262,6 +262,59 @@ pinecone.upsert({
 
 ---
 
+## Document Parsing Pipeline
+
+```
+File received from Dropbox
+         │
+         ▼
+┌─────────────────────────┐
+│  Try Docling (Primary)  │
+│  - Zero-disk (BytesIO)  │
+│  - Structure-aware      │
+│  - Multi-format support │
+└───────────┬─────────────┘
+            │
+            ▼
+      Success? ──────────────────────────────┐
+         │                                    │
+         │ No                                 │ Yes
+         ▼                                    ▼
+┌─────────────────────────┐          Return full_text
+│  Fallback: PyPDF2/Text  │          + elements
+│  - PDF: PyPDF2 extract  │
+│  - TXT/MD: Raw decode   │
+└───────────┬─────────────┘
+            │
+            ▼
+      Success? ──────────────────────────────┐
+         │                                    │
+         │ No                                 │ Yes
+         ▼                                    ▼
+   Return ERROR:                      Return full_text
+   "No text extracted"                (parse_method: fallback)
+```
+
+### Parse Methods
+
+| Method | Description | Quality |
+|--------|-------------|---------|
+| `docling` | Docling structure-aware parsing | High |
+| `fallback_pypdf2` | PyPDF2 text extraction for PDFs | Medium |
+| `fallback_text` | Raw text decode for TXT/MD | High |
+| `failed` | No text could be extracted | N/A |
+
+### Limitations
+
+| Scenario | Result | Solution |
+|----------|--------|----------|
+| Scanned PDF (image-based) | No text extracted | Install Tesseract OCR |
+| Image files (PNG, JPG) | No text extracted | Install Tesseract OCR |
+| Encrypted PDF | Parse error | Decrypt before upload |
+| Corrupted file | Parse error | Re-export from source |
+
+---
+
 ## Data Flow: Query
 
 ```python

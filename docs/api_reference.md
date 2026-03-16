@@ -268,8 +268,14 @@ Parse multiple files with Docling and return complete parsed output. **This is t
 **Key Fields:**
 - `elements` - Structured document elements (for display/preview)
 - `full_text` - Concatenated text from all elements (for client-side chunking)
+- `parse_method` - Which parser succeeded: `docling`, `fallback_pypdf2`, `fallback_text`, or `failed`
 
 **Supported Formats:** PDF, DOCX, PPTX, XLSX, HTML, Markdown, PNG, JPG, TIFF, BMP
+
+**Parsing Pipeline:**
+1. Try Docling (primary, structure-aware, zero-disk)
+2. If Docling fails → Fallback to PyPDF2 (for PDFs) or raw text decode (for TXT/MD)
+3. If both fail → Return `status: "ERROR"` with `full_text: ""`
 
 **Single-Download Flow:** This endpoint enables the unified indexing flow:
 1. Browser calls `/parse-docling` once
@@ -277,6 +283,16 @@ Parse multiple files with Docling and return complete parsed output. **This is t
 3. Returns both structure (`elements`) and text (`full_text`)
 4. Browser chunks `full_text` client-side
 5. No separate `/dropbox/file` call needed
+
+**Error Scenarios:**
+
+| Scenario | Status | Error Message |
+|----------|--------|---------------|
+| Docling succeeds | `OK` | `null` |
+| Docling fails, PyPDF2 succeeds | `OK` | `null` |
+| Scanned PDF (no OCR) | `ERROR` | `No text extracted` |
+| Encrypted PDF | `ERROR` | `Could not extract text` |
+| Unsupported format | `ERROR` | `Unsupported format` |
 
 **Zero-Disk Note:** Each file processed in memory using `DocumentStream(BytesIO)`. No temp files created.
 

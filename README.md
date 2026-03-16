@@ -89,6 +89,19 @@ Your Question ──→ Find matching ──→ Re-fetch text
 4. **Search** - Query your documents with natural language
 5. **Answer** - Get cited responses from your indexed content
 
+## Supported File Types
+
+| Format | Support | Notes |
+|--------|---------|-------|
+| PDF (text-based) | ✅ Full | Docling with PyPDF2 fallback |
+| PDF (scanned/image) | ⚠️ Limited | Requires OCR (Tesseract) |
+| DOCX, PPTX, XLSX | ✅ Full | Via Docling |
+| TXT, Markdown | ✅ Full | Direct text extraction |
+| HTML | ✅ Full | Via Docling |
+| Images (PNG, JPG) | ⚠️ Limited | Requires OCR |
+
+> **Note**: Scanned PDFs and images require Tesseract OCR installed on the server for text extraction.
+
 ## What Gets Stored
 
 | Data | Stored? | Where |

@@ -43,9 +43,24 @@ The system implements a **zero-disk-touch** architecture for document processing
 #### Implementation Details
 
 - **Docling Processing**: Uses `DocumentStream` with `BytesIO` for in-memory parsing
+- **Fallback Parsing**: PyPDF2 (PDFs) or raw decode (TXT/MD) when Docling unavailable
 - **No Temp Files**: Files are never written to `/tmp/` or any disk location
 - **Automatic Purge**: Memory released when HTTP request completes
 - **Audit Logging**: Processing logs include "Zero-disk processing" markers
+
+#### Parsing Fallback Chain
+
+```
+1. Docling (BytesIO) ──► Success: High-quality structured output
+         │
+         ▼ Fails
+2. PyPDF2/Raw text ───► Success: Basic text extraction
+         │
+         ▼ Fails
+3. Return error ──────► "No text extracted" (e.g., scanned PDFs)
+```
+
+All fallback methods maintain zero-disk guarantees (in-memory processing only).
 
 #### Deployment Requirements for Zero-Disk Guarantee
 
