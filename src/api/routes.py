@@ -458,7 +458,6 @@ async def eval_parsing(request: dict):
 
     Returns parsing metrics and element breakdown.
     """
-    import tempfile
     from pathlib import Path
 
     file_path = request.get("path")
@@ -481,48 +480,37 @@ async def eval_parsing(request: dict):
             if response.status_code != 200:
                 return {"error": f"Dropbox download failed: {response.text}"}
 
-        # Save to temp file
+        # Zero-disk processing: parse directly from memory
+        from src.ingestion.docling_loader import load_document_from_bytes
+        from collections import Counter
+
         filename = Path(file_path).name
-        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as tmp:
-            tmp.write(response.content)
-            tmp_path = tmp.name
+        doc = load_document_from_bytes(response.content, filename)
 
-        # Run Docling parsing
-        try:
-            from src.ingestion.docling_loader import load_document_with_docling
-            from collections import Counter
+        # Count element types
+        type_counts = Counter(el.element_type for el in doc.elements)
 
-            doc = load_document_with_docling(tmp_path)
+        # Sample elements
+        samples = []
+        for el in doc.elements[:10]:
+            samples.append({
+                "type": el.element_type,
+                "text": el.text[:200] + "..." if len(el.text) > 200 else el.text,
+                "level": el.level
+            })
 
-            # Count element types
-            type_counts = Counter(el.element_type for el in doc.elements)
-
-            # Sample elements
-            samples = []
-            for el in doc.elements[:10]:
-                samples.append({
-                    "type": el.element_type,
-                    "text": el.text[:200] + "..." if len(el.text) > 200 else el.text,
-                    "level": el.level
-                })
-
-            result = {
-                "status": doc.status,
-                "filename": doc.filename,
-                "format": doc.format,
-                "total_elements": len(doc.elements),
-                "total_chars": doc.chars,
-                "total_words": doc.words,
-                "page_count": doc.page_count,
-                "element_types": dict(type_counts),
-                "sample_elements": samples,
-                "error": doc.error
-            }
-
-        finally:
-            # Clean up temp file
-            import os
-            os.unlink(tmp_path)
+        result = {
+            "status": doc.status,
+            "filename": doc.filename,
+            "format": doc.format,
+            "total_elements": len(doc.elements),
+            "total_chars": doc.chars,
+            "total_words": doc.words,
+            "page_count": doc.page_count,
+            "element_types": dict(type_counts),
+            "sample_elements": samples,
+            "error": doc.error
+        }
 
         return result
 
@@ -548,8 +536,6 @@ async def parse_docling(request: dict):
 
     Returns array of parsed documents with ALL elements (not samples).
     """
-    import tempfile
-    import os
     from pathlib import Path
     from collections import Counter
 
@@ -592,47 +578,39 @@ async def parse_docling(request: dict):
                     })
                     continue
 
-            # Save to temp file
-            suffix = Path(file_name).suffix or Path(file_path).suffix
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(response.content)
-                tmp_path = tmp.name
+            # Zero-disk processing: parse directly from memory
+            from src.ingestion.docling_loader import load_document_from_bytes
 
-            try:
-                from src.ingestion.docling_loader import load_document_with_docling
+            doc = load_document_from_bytes(response.content, file_name)
 
-                doc = load_document_with_docling(tmp_path)
+            # Count element types
+            type_counts = Counter(el.element_type for el in doc.elements)
 
-                # Count element types
-                type_counts = Counter(el.element_type for el in doc.elements)
-
-                # Return ALL elements (not just samples)
-                all_elements = []
-                for el in doc.elements:
-                    all_elements.append({
-                        "type": el.element_type,
-                        "text": el.text,
-                        "level": el.level,
-                        "page": getattr(el, 'page', None),
-                        "metadata": getattr(el, 'metadata', {})
-                    })
-
-                results.append({
-                    "filename": file_name,
-                    "path": file_path,
-                    "status": doc.status,
-                    "format": doc.format,
-                    "total_elements": len(doc.elements),
-                    "total_chars": doc.chars,
-                    "total_words": doc.words,
-                    "page_count": doc.page_count,
-                    "element_types": dict(type_counts),
-                    "elements": all_elements,
-                    "error": doc.error
+            # Return ALL elements (not just samples)
+            all_elements = []
+            for el in doc.elements:
+                all_elements.append({
+                    "type": el.element_type,
+                    "text": el.text,
+                    "level": el.level,
+                    "page": getattr(el, 'page', None),
+                    "metadata": getattr(el, 'metadata', {})
                 })
 
-            finally:
-                os.unlink(tmp_path)
+            results.append({
+                "filename": file_name,
+                "path": file_path,
+                "status": doc.status,
+                "format": doc.format,
+                "total_elements": len(doc.elements),
+                "total_chars": doc.chars,
+                "total_words": doc.words,
+                "page_count": doc.page_count,
+                "element_types": dict(type_counts),
+                "elements": all_elements,
+                "full_text": doc.full_text,  # For client-side chunking (single-download flow)
+                "error": doc.error
+            })
 
         except Exception as e:
             results.append({

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { embedChunks, clearIndex, parseWithDocling } from '../api/client';
-import { processSelectedFiles } from '../api/dropbox';
 import { chunkFiles } from '../api/chunker';
 import ProcessingStatus from './ProcessingStatus';
 import IndexSummary from './IndexSummary';
@@ -17,9 +16,8 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
   const [stagedFiles, setStagedFiles] = useState([]);
   const [accessToken, setAccessToken] = useState(null);
 
-  // State for Docling parsing output
+  // State for Docling parsing output (unified flow - single download)
   const [parsedDocuments, setParsedDocuments] = useState(null);
-  const [pendingFileContents, setPendingFileContents] = useState(null);
 
   // Handle files staged from CloudConnect (not processed yet)
   const handleFilesStaged = (files) => {
@@ -47,7 +45,7 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
     setStagedFiles([]);
   };
 
-  // Start indexing the staged files - Phase 1: Read and Parse
+  // Start indexing the staged files - Single download with Docling parsing
   const handleIndexFiles = async () => {
     if (stagedFiles.length === 0 || !accessToken) return;
 
@@ -56,26 +54,8 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
     setIndexResult(null);
 
     try {
-      // Step 1: Read files from Dropbox
-      setProcessingState({ step: 'read', fileName: `${stagedFiles.length} files`, progress: 10 });
-
-      const fileContents = await processSelectedFiles(stagedFiles, accessToken, (progress) => {
-        setProcessingState({
-          step: 'read',
-          fileName: progress.fileName,
-          progress: 10 + (progress.current / progress.total) * 15,
-        });
-      });
-
-      if (fileContents.length === 0) {
-        setMessage({ type: 'error', text: 'No readable files found' });
-        setLoading(false);
-        setProcessingState(null);
-        return;
-      }
-
-      // Step 2: Parse with Docling
-      setProcessingState({ step: 'parse', fileName: `${fileContents.length} files`, progress: 28 });
+      // Single download: Parse with Docling (returns full_text for chunking)
+      setProcessingState({ step: 'parse', fileName: `${stagedFiles.length} files`, progress: 15 });
 
       const parseResult = await parseWithDocling(
         stagedFiles.map(f => ({ path: f.path_lower, name: f.name })),
@@ -89,9 +69,19 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
         return;
       }
 
+      // Filter successful parses
+      const successfulDocs = parseResult.results.filter(r => r.status === 'OK' && r.full_text);
+
+      if (successfulDocs.length === 0) {
+        setMessage({ type: 'error', text: 'No files could be parsed' });
+        setLoading(false);
+        setProcessingState(null);
+        return;
+      }
+
       // Store results and pause for user review
+      // full_text is included in each result for chunking
       setParsedDocuments(parseResult.results);
-      setPendingFileContents(fileContents);
       setProcessingState(null);
       setLoading(false);
       // User will click "Continue to Indexing" in DoclingOutput
@@ -104,36 +94,52 @@ export default function Sidebar({ onStatusChange, onAccessTokenChange }) {
   };
 
   // Continue indexing after user reviews Docling output
+  // Uses full_text from Docling parsing (single-download, higher quality)
   const handleContinueIndexing = async () => {
-    if (!pendingFileContents) return;
+    if (!parsedDocuments) return;
 
     setLoading(true);
-    setParsedDocuments(null);
 
     try {
-      const fileContents = pendingFileContents;
-      setPendingFileContents(null);
+      // Convert Docling results to file contents format for chunking
+      // Uses full_text from Docling (higher quality than PyPDF2)
+      const fileContents = parsedDocuments
+        .filter(doc => doc.status === 'OK' && doc.full_text)
+        .map(doc => ({
+          id: doc.path,  // Use path as ID since we don't have Dropbox ID here
+          name: doc.filename,
+          path: doc.path,
+          content: doc.full_text,  // Docling-parsed text (zero-disk, single download)
+        }));
 
-      // Step 3: Chunk files (client-side)
+      setParsedDocuments(null);
+
+      if (fileContents.length === 0) {
+        setMessage({ type: 'error', text: 'No content to index' });
+        setLoading(false);
+        return;
+      }
+
+      // Step 1: Chunk files (client-side) using Docling output
       setProcessingState({ step: 'chunk', fileName: `${fileContents.length} files`, progress: 40 });
       await new Promise(r => setTimeout(r, 100));
 
       const chunks = chunkFiles(fileContents);
 
-      // Step 4: Clear existing index
+      // Step 2: Clear existing index
       setProcessingState({ step: 'clear', fileName: 'Clearing old data', progress: 50 });
       await clearIndex();
 
-      // Step 5: Send chunks to server for embedding
+      // Step 3: Send chunks to server for embedding
       setProcessingState({ step: 'embed', fileName: `${chunks.length} chunks`, progress: 65 });
 
       const result = await embedChunks(chunks);
 
-      // Step 6: Show discard step
+      // Step 4: Show discard step
       setProcessingState({ step: 'discard', fileName: '', progress: 85 });
       await new Promise(r => setTimeout(r, 300));
 
-      // Step 7: Complete
+      // Step 5: Complete
       setProcessingState({ step: 'save', fileName: '', progress: 100 });
       await new Promise(r => setTimeout(r, 200));
 

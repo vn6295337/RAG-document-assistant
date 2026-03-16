@@ -22,11 +22,11 @@ A privacy-first RAG (Retrieval-Augmented Generation) system where **no document 
 ## Privacy Architecture
 
 ```
-INDEXING (one-time setup)
+INDEXING (one-time setup) - SINGLE DOWNLOAD FLOW
 ══════════════════════════════════════════════════════════════════
 
-  User's Browser                              Our Server
-  ──────────────                              ──────────
+  User's Browser                              Our Server (Zero-Disk)
+  ──────────────                              ─────────────────────
 
   1. Connect Dropbox (OAuth)
            │
@@ -34,27 +34,40 @@ INDEXING (one-time setup)
   2. Select files from Dropbox
            │
            ▼
-  3. Files loaded in browser
-     (never sent to server)
+  3. Click "Index Selected Files"
+           │
+           └──────────────────────────────► 4. SINGLE DOWNLOAD from Dropbox
+                                                  │
+                                              5. Parse with Docling
+                                                 (BytesIO - RAM only)
+                                                 (No temp files created)
+                                                  │
+           ┌──────────────────────────────────────┘
+           │
+  6. Display parsed structure ◄────────────  Returns:
+     for user review                          - parsed_structure
+           │                                  - full_text (for chunking)
+           ▼
+  7. User clicks "Continue"
            │
            ▼
-  4. Text chunked locally ───────────────► 5. Generate embeddings
-     with position tracking                    (384-dim vectors)
+  8. Chunk full_text locally ─────────────► 9. Generate embeddings
+     (client-side, uses Docling output)        (384-dim vectors)
            │                                        │
            ▼                                        ▼
-  6. Original text                          7. Store in Pinecone:
-     PURGED from memory                        - Embeddings (irreversible)
-                                               - File paths
-                                               - Chunk positions
-                                               - NO TEXT
+  10. Original text                         11. Store in Pinecone:
+      PURGED from browser                       - Embeddings (irreversible)
+                                                - File paths
+                                                - Chunk positions
+                                                - NO TEXT
 
 ══════════════════════════════════════════════════════════════════
 
 QUERY TIME (every search)
 ══════════════════════════════════════════════════════════════════
 
-  User's Question                             Our Server
-  ───────────────                             ──────────
+  User's Question                             Our Server (Zero-Disk)
+  ───────────────                             ─────────────────────
 
   "What does the contract say?"
            │
@@ -70,7 +83,7 @@ QUERY TIME (every search)
                                               │
                                               ▼
                                          4. Re-fetch from USER'S Dropbox
-                                            using their access token
+                                            (BytesIO - RAM only)
                                               │
                                               ▼
                                          5. Extract chunk text
@@ -189,7 +202,7 @@ QUERY TIME (every search)
 
 ---
 
-## Data Flow: Indexing
+## Data Flow: Indexing (Single Download)
 
 ```python
 # 1. User selects files in browser
@@ -197,44 +210,55 @@ files = [
     {id: "abc123", name: "contract.pdf", path: "/Documents/contract.pdf"}
 ]
 
-# 2. Files fetched from Dropbox (via backend proxy)
-content = await fetch("/api/dropbox/file", {path: file.path, access_token})
+# 2. SINGLE DOWNLOAD: Parse with Docling (zero-disk)
+response = await fetch("/api/parse-docling", {
+    files: [{path: "/Documents/contract.pdf", name: "contract.pdf"}],
+    access_token: "..."
+})
+# Server: Downloads once → BytesIO → DocumentStream → Docling
+# Returns: {results: [{full_text: "...", elements: [...], ...}]}
 
-# 3. Text chunked CLIENT-SIDE with position tracking
-chunks = chunkText(content, {chunkSize: 1000, overlap: 100})
-# Result:
-# {text: "...", startChar: 0, endChar: 1000}
-# {text: "...", startChar: 900, endChar: 1900}
+# 3. Display parsed structure for user review
+showDoclingOutput(response.results)
 
-# 4. Chunks sent to backend for embedding
+# 4. User clicks "Continue" → Chunk full_text CLIENT-SIDE
+fileContents = response.results.map(r => ({
+    name: r.filename,
+    path: r.path,
+    content: r.full_text  // Docling-parsed text (higher quality)
+}))
+chunks = chunkFiles(fileContents)
+# Result: [{text: "...", startChar: 0, endChar: 500}, ...]
+
+# 5. Chunks sent to backend for embedding
 await fetch("/api/embed-chunks", {
     chunks: [{
         text: "...",  // Used for embedding only
         metadata: {
             filename: "contract.pdf",
             filePath: "/Documents/contract.pdf",
-            fileId: "abc123",
             startChar: 0,
-            endChar: 1000
+            endChar: 500
         }
     }]
 })
 
-# 5. Backend generates embeddings, stores in Pinecone
+# 6. Backend generates embeddings, stores in Pinecone
 # TEXT IS IMMEDIATELY DISCARDED
 pinecone.upsert({
-    id: "abc123::0",
+    id: "contract.pdf::0",
     values: [0.123, -0.456, ...],  # 384-dim embedding
     metadata: {
         filename: "contract.pdf",
         file_path: "/Documents/contract.pdf",
-        file_id: "abc123",
         start_char: 0,
-        end_char: 1000
+        end_char: 500
         # NO TEXT STORED
     }
 })
 ```
+
+**Key Improvement:** Single download eliminates double-fetch. Docling output (higher quality than PyPDF2) used for chunking.
 
 ---
 
@@ -296,10 +320,80 @@ return {answer, citations}
 - **Memory Only**: Text exists in memory only during processing
 - **Immediate Purge**: Explicit deletion after embedding generation
 
+### Zero-Disk Processing (Docling)
+
+Document parsing uses in-memory streams to ensure files never touch disk:
+
+```python
+# Implementation in src/ingestion/docling_loader.py
+
+def load_document_from_bytes(file_bytes: bytes, filename: str) -> ParsedDocument:
+    """Load document from in-memory bytes (zero-disk-touch)."""
+    from io import BytesIO
+    from docling.datamodel.base_models import DocumentStream
+
+    # Zero-disk: BytesIO wrapper keeps bytes in RAM
+    buf = BytesIO(file_bytes)
+    stream = DocumentStream(name=filename, stream=buf)
+    result = converter.convert(stream)  # No disk I/O
+
+    # Metadata flags for audit
+    return ParsedDocument(
+        path="<memory>",
+        metadata={"zero_disk": True}
+    )
+```
+
+**Key Implementation Details:**
+
+| Aspect | Before (Temp Files) | After (Zero-Disk) |
+|--------|---------------------|-------------------|
+| **File handling** | `tempfile.NamedTemporaryFile()` | `BytesIO()` |
+| **Docling input** | File path string | `DocumentStream` |
+| **Disk I/O** | Write to `/tmp/` | None |
+| **Cleanup** | `os.unlink()` (insecure) | Automatic (GC) |
+| **Forensic recovery** | Possible | Not possible |
+
+**API Endpoints Using Zero-Disk:**
+- `POST /eval/parsing` - Document parsing evaluation
+- `POST /parse-docling` - Batch document parsing
+
+**Audit Logging:**
+```
+INFO: Zero-disk processing: contract.pdf (2,456,789 bytes) - No temp file created
+```
+
 ### Data Protection
 - **Embeddings**: One-way transformation, cannot reconstruct text
 - **Positions**: Only useful with original file access
 - **File Paths**: Dropbox paths, require valid access token
+
+### Deployment Requirements
+
+For guaranteed zero-disk operation:
+
+1. **Swap Disabled**: Prevents RAM from being paged to disk
+   ```bash
+   swapoff -a
+   ```
+
+2. **Memory Sizing**:
+   ```
+   Required RAM = Base (2GB) + (50MB × concurrent_users × 3)
+   ```
+   Factor of 3 accounts for Docling parsing overhead.
+
+3. **File Size Limits**: 50MB maximum per file
+
+### Security Caveats
+
+| Risk | Likelihood | Mitigation |
+|------|------------|------------|
+| Swap enabled | Medium | Verify `swapon --show` is empty |
+| Memory dump | Low | Requires root access during processing |
+| Cold boot | Very Low | Physical access + timing attack |
+
+See [SECURITY.md](../SECURITY.md) for full security policy.
 
 ---
 

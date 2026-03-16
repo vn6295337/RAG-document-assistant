@@ -27,6 +27,59 @@ Please do not publicly disclose the issue until it has been addressed by the tea
 - No raw document content is sent to LLM providers, only relevant chunks
 - All processing respects data privacy regulations (GDPR, CCPA, etc.)
 
+### Zero-Disk Architecture
+
+The system implements a **zero-disk-touch** architecture for document processing:
+
+#### What This Means
+
+| Data State | Storage Location | Persistence |
+|------------|------------------|-------------|
+| File bytes during parsing | RAM only | Request duration (~1-5s) |
+| Parsed document structure | RAM only | Request duration |
+| Generated embeddings | Pinecone | Persistent (irreversible) |
+| Original text | Never stored | N/A |
+
+#### Implementation Details
+
+- **Docling Processing**: Uses `DocumentStream` with `BytesIO` for in-memory parsing
+- **No Temp Files**: Files are never written to `/tmp/` or any disk location
+- **Automatic Purge**: Memory released when HTTP request completes
+- **Audit Logging**: Processing logs include "Zero-disk processing" markers
+
+#### Deployment Requirements for Zero-Disk Guarantee
+
+To guarantee zero-disk-touch, the deployment environment must meet:
+
+1. **Swap Disabled**: OS swap/page file must be disabled
+   ```bash
+   # Verify swap is disabled
+   swapon --show  # Should return empty
+
+   # Disable swap
+   sudo swapoff -a
+   ```
+
+2. **Sufficient RAM**: Minimum 2GB RAM + (50MB × max concurrent users)
+
+3. **File Size Limits**: 50MB maximum file size enforced in application
+
+#### Limitations and Caveats
+
+- **Swap Risk**: If OS swap is enabled, RAM contents may be paged to disk under memory pressure
+- **Cold Boot Attack**: Theoretical risk if physical RAM is extracted within seconds of processing
+- **Memory Dumps**: Root access during processing could expose data in RAM
+
+#### Verification
+
+```bash
+# Check if swap is enabled
+free -h | grep Swap
+
+# Monitor temp directory during processing
+watch -n 1 'ls -la /tmp/*.pdf /tmp/*.docx 2>/dev/null | wc -l'
+```
+
 ### Network Security
 
 - API calls use HTTPS endpoints
@@ -37,7 +90,7 @@ Please do not publicly disclose the issue until it has been addressed by the tea
 
 - All user inputs are validated and sanitized
 - File uploads are restricted to specific formats
-- Size limits are enforced for document processing
+- Size limits are enforced for document processing (50MB max)
 
 ## Best Practices
 

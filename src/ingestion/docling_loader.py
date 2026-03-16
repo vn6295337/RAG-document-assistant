@@ -155,6 +155,80 @@ def _extract_elements_from_docling(doc_result) -> List[DocumentElement]:
     return elements
 
 
+def load_document_from_bytes(file_bytes: bytes, filename: str) -> ParsedDocument:
+    """
+    Load a document from in-memory bytes (zero-disk-touch).
+
+    Args:
+        file_bytes: Raw file content as bytes
+        filename: Original filename (used for format detection)
+
+    Returns:
+        ParsedDocument with extracted structure and content
+    """
+    from io import BytesIO
+
+    ext = Path(filename).suffix.lower()
+    if ext not in SUPPORTED_EXTENSIONS:
+        return ParsedDocument(
+            filename=filename,
+            path="<memory>",
+            elements=[],
+            format=ext,
+            status="SKIPPED",
+            error=f"Unsupported format: {ext}"
+        )
+
+    try:
+        # Import DocumentStream here to avoid overhead
+        from docling.datamodel.base_models import DocumentStream
+
+        # Security audit marker
+        logger.info(f"Zero-disk processing: {filename} ({len(file_bytes):,} bytes) - No temp file created")
+
+        converter = _get_docling_converter()
+
+        # Zero-disk processing: keep bytes in RAM only
+        buf = BytesIO(file_bytes)
+        stream = DocumentStream(name=filename, stream=buf)
+        result = converter.convert(stream)
+
+        elements = _extract_elements_from_docling(result)
+
+        # Get page count if available
+        page_count = 0
+        try:
+            if hasattr(result.document, "pages"):
+                page_count = len(result.document.pages)
+        except Exception:
+            pass
+
+        return ParsedDocument(
+            filename=filename,
+            path="<memory>",
+            elements=elements,
+            format=ext,
+            page_count=page_count,
+            metadata={
+                "converter": "docling",
+                "element_count": len(elements),
+                "zero_disk": True
+            },
+            status="OK"
+        )
+
+    except Exception as e:
+        logger.error(f"Error processing {filename}: {e}")
+        return ParsedDocument(
+            filename=filename,
+            path="<memory>",
+            elements=[],
+            format=ext,
+            status="ERROR",
+            error=str(e)
+        )
+
+
 def load_document_with_docling(file_path: str) -> ParsedDocument:
     """
     Load a single document using Docling.

@@ -175,6 +175,126 @@ Download file content from Dropbox. Supports text files and PDFs (with text extr
 
 ---
 
+## Document Parsing Endpoints (Zero-Disk)
+
+These endpoints use **zero-disk processing** - files are parsed entirely in memory using `BytesIO` and `DocumentStream`. No temporary files are created.
+
+### POST /eval/parsing
+
+Evaluate Docling parsing on a single file from Dropbox.
+
+**Request Body:**
+```json
+{
+  "path": "/Documents/contract.pdf",
+  "access_token": "dropbox_access_token"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "OK",
+  "filename": "contract.pdf",
+  "format": ".pdf",
+  "total_elements": 42,
+  "total_chars": 15234,
+  "total_words": 2156,
+  "page_count": 5,
+  "element_types": {
+    "paragraph": 30,
+    "heading": 8,
+    "list": 4
+  },
+  "sample_elements": [
+    {
+      "type": "heading",
+      "text": "Agreement Terms...",
+      "level": 1
+    }
+  ],
+  "error": null
+}
+```
+
+**Zero-Disk Note:** File bytes are processed using `BytesIO` → `DocumentStream` → Docling. No temp files created. Logs show: `Zero-disk processing: contract.pdf (X bytes) - No temp file created`
+
+---
+
+### POST /parse-docling
+
+Parse multiple files with Docling and return complete parsed output. **This is the primary endpoint for the single-download indexing flow.**
+
+**Request Body:**
+```json
+{
+  "files": [
+    {"path": "/Documents/doc1.pdf", "name": "doc1.pdf"},
+    {"path": "/Documents/doc2.docx", "name": "doc2.docx"}
+  ],
+  "access_token": "dropbox_access_token"
+}
+```
+
+**Response:**
+```json
+{
+  "results": [
+    {
+      "filename": "doc1.pdf",
+      "path": "/Documents/doc1.pdf",
+      "status": "OK",
+      "format": ".pdf",
+      "total_elements": 42,
+      "total_chars": 15234,
+      "total_words": 2156,
+      "page_count": 5,
+      "element_types": {"paragraph": 30, "heading": 8},
+      "elements": [
+        {
+          "type": "heading",
+          "text": "Full heading text here",
+          "level": 1,
+          "metadata": {}
+        }
+      ],
+      "full_text": "Full concatenated text from all elements...",
+      "error": null
+    }
+  ]
+}
+```
+
+**Key Fields:**
+- `elements` - Structured document elements (for display/preview)
+- `full_text` - Concatenated text from all elements (for client-side chunking)
+
+**Supported Formats:** PDF, DOCX, PPTX, XLSX, HTML, Markdown, PNG, JPG, TIFF, BMP
+
+**Single-Download Flow:** This endpoint enables the unified indexing flow:
+1. Browser calls `/parse-docling` once
+2. Server downloads from Dropbox, parses with Docling (BytesIO - zero-disk)
+3. Returns both structure (`elements`) and text (`full_text`)
+4. Browser chunks `full_text` client-side
+5. No separate `/dropbox/file` call needed
+
+**Zero-Disk Note:** Each file processed in memory using `DocumentStream(BytesIO)`. No temp files created.
+
+---
+
+### GET /eval/formats
+
+Get list of supported document formats for Docling parsing.
+
+**Response:**
+```json
+{
+  "formats": [".pdf", ".docx", ".pptx", ".xlsx", ".html", ".md", ".png", ".jpg"]
+}
+```
+
+---
+
 ## Utility Endpoints
 
 ### GET /health

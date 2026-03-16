@@ -28,20 +28,34 @@ short_description: Privacy-first document search with zero storage
 ## Privacy-First Architecture
 
 ```
-INDEXING (one-time)
+INDEXING (one-time) - Single Download
 ───────────────────────────────────────────────────────────
-Your Device                           Server
+Your Device                           Server (Zero-Disk)
 ───────────────────────────────────────────────────────────
-  Dropbox ──→ Files loaded
-              in browser
-                 │
-                 ▼
-           Text chunked ─────────────→ Embeddings +
-           locally                     file positions only
-                 │                     (no text stored)
-                 ▼
-           Original text
-           PURGED ✓
+  1. Select files
+     from Dropbox
+         │
+         └────────────────────────→ 2. Download ONCE from
+                                      your Dropbox
+                                         │
+                                      3. Parse with Docling
+                                         (BytesIO - RAM only)
+                                         │
+         ┌───────────────────────────────┘
+         │
+  4. Display structure ◄─────────── Returns: structure +
+     for review                     full_text (for chunking)
+         │
+  5. Chunk text
+     locally (browser)
+         │
+         └────────────────────────→ 6. Generate embeddings
+                                      (text discarded)
+                                         │
+                                      7. Store in Pinecone:
+                                         - Embeddings only
+                                         - File positions
+                                         - NO TEXT
 ───────────────────────────────────────────────────────────
 
 QUERY TIME (every search)
@@ -57,11 +71,15 @@ Your Question ──→ Find matching ──→ Re-fetch text
 
 ### True Zero-Storage Privacy
 
-1. **Client-Side Chunking**: Documents are read and chunked entirely in your browser
-2. **Embeddings Only**: Only mathematical vectors are stored (irreversible)
-3. **No Text Stored**: Only file paths and character positions are kept
-4. **Query-Time Re-fetch**: Text is retrieved fresh from YOUR Dropbox for each query
-5. **You Control Access**: Disconnect Dropbox = queries stop working = your data stays yours
+1. **Single Download**: Each file downloaded once, parsed with Docling, returns text + structure
+2. **Zero-Disk Processing**: Parsing uses BytesIO/DocumentStream (RAM only, no temp files)
+3. **Client-Side Chunking**: Docling output chunked in your browser
+4. **Embeddings Only**: Only mathematical vectors stored (irreversible)
+5. **No Text Stored**: Only file paths and character positions kept
+6. **Query-Time Re-fetch**: Text retrieved fresh from YOUR Dropbox for each query
+7. **You Control Access**: Disconnect Dropbox = queries stop working = your data stays yours
+
+> **Note**: Zero-disk guarantee requires swap to be disabled on the deployment server. See [SECURITY.md](SECURITY.md) for details.
 
 ## How It Works
 
