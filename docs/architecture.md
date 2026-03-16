@@ -63,7 +63,7 @@ INDEXING (one-time setup) - SINGLE DOWNLOAD FLOW
 
 ══════════════════════════════════════════════════════════════════
 
-QUERY TIME (every search)
+QUERY TIME (every search) - ADVANCED RETRIEVAL PIPELINE
 ══════════════════════════════════════════════════════════════════
 
   User's Question                             Our Server (Zero-Disk)
@@ -72,29 +72,51 @@ QUERY TIME (every search)
   "What does the contract say?"
            │
            ▼
-  ─────────────────────────────────────► 1. Generate query embedding
+  ─────────────────────────────────────► 1. QUERY REWRITING
+                                            Expand with synonyms/variants
                                               │
                                               ▼
-                                         2. Search Pinecone
-                                            (find similar chunks)
+                                         2. MULTI-QUERY SEARCH
+                                            Search Pinecone with all variants
+                                            Deduplicate across results
                                               │
                                               ▼
-                                         3. Get file paths + positions
+                                         3. RE-FETCH FROM DROPBOX
+                                            Download files (BytesIO - RAM only)
+                                            Extract text using positions
                                               │
                                               ▼
-                                         4. Re-fetch from USER'S Dropbox
-                                            (BytesIO - RAM only)
+                                         4. RERANKING
+                                            Cross-encoder precision boost
+                                            Reorder by relevance to query
                                               │
                                               ▼
-                                         5. Extract chunk text
-                                            using stored positions
+                                         5. CONTEXT SHAPING
+                                            Token budget enforcement
+                                            Deduplication & pruning
                                               │
                                               ▼
-                                         6. Send to LLM for answer
+                                         6. LLM GENERATION
+                                            Build prompt, call LLM
                                               │
                                               ▼
   Answer + Citations ◄─────────────────  7. Return response
                                             (text never stored)
+
+══════════════════════════════════════════════════════════════════
+
+RETRIEVAL FEATURES COMPARISON
+══════════════════════════════════════════════════════════════════
+
+  Feature              │ /query-secure  │ /query (legacy)
+  ─────────────────────┼────────────────┼─────────────────
+  Query Rewriting      │ ✅ Enabled      │ ✅ Enabled
+  Semantic Search      │ ✅ Pinecone     │ ✅ Pinecone
+  BM25 Keyword Search  │ ❌ N/A          │ ✅ Local corpus
+  Hybrid Fusion        │ ❌ N/A          │ ✅ RRF fusion
+  Reranking            │ ✅ Post-refetch │ ✅ Pre-generation
+  Context Shaping      │ ✅ Token budget │ ✅ Token budget
+  Zero-Storage         │ ✅ Yes          │ ❌ No
 
 ══════════════════════════════════════════════════════════════════
 ```

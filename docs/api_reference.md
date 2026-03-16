@@ -44,16 +44,32 @@ Generate embeddings for text chunks and store in Pinecone. **Text is discarded i
 
 ### POST /query-secure
 
-Execute a zero-storage query. Re-fetches text from user's Dropbox at query time.
+Execute a zero-storage query with advanced retrieval pipeline. Re-fetches text from user's Dropbox at query time.
 
 **Request Body:**
 ```json
 {
   "query": "What are the payment terms?",
   "access_token": "dropbox_access_token",
-  "top_k": 3
+  "top_k": 3,
+  "use_rewriting": true,
+  "use_reranking": true,
+  "use_context_shaping": true,
+  "token_budget": 2000
 }
 ```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | string | required | User's question |
+| `access_token` | string | required | Dropbox OAuth token |
+| `top_k` | int | 3 | Number of chunks to return |
+| `use_rewriting` | bool | true | Enable query expansion/rewriting |
+| `use_reranking` | bool | true | Enable cross-encoder reranking |
+| `use_context_shaping` | bool | true | Enable token budget & deduplication |
+| `token_budget` | int | 2000 | Max tokens for context |
 
 **Response:**
 ```json
@@ -66,17 +82,40 @@ Execute a zero-storage query. Re-fetches text from user's Dropbox at query time.
       "snippet": "Payment terms: Net 30 days from invoice date..."
     }
   ],
+  "pipeline_meta": {
+    "rewriting_enabled": true,
+    "reranking_enabled": true,
+    "context_shaping_enabled": true,
+    "query_variants": 2,
+    "initial_matches": 9,
+    "rerank_model": "cross-encoder",
+    "original_tokens": 1500,
+    "final_tokens": 1200
+  },
   "error": null
 }
 ```
 
-**Flow:**
-1. Generate query embedding
-2. Search Pinecone for similar chunks
-3. Re-fetch files from user's Dropbox using provided token
-4. Extract chunk text using stored positions
-5. Send to LLM for answer generation
-6. Return answer (text never stored)
+**Pipeline Flow:**
+```
+1. Query Rewriting ──► Expand query with synonyms/variants
+         │
+2. Multi-Query Search ──► Search Pinecone with all variants
+         │
+3. Deduplicate ──► Remove duplicate chunks across variants
+         │
+4. Re-fetch from Dropbox ──► Get actual text (zero-storage)
+         │
+5. Reranking ──► Cross-encoder precision boost
+         │
+6. Context Shaping ──► Token budget, deduplication, pruning
+         │
+7. LLM Generation ──► Build prompt, generate answer
+         │
+8. Return ──► Answer + citations (text never stored)
+```
+
+**Note:** BM25 keyword search is not available in zero-storage mode (requires local text corpus). Use `/query` endpoint for full hybrid search with local storage.
 
 ---
 

@@ -246,15 +246,24 @@ async def embed_chunks(request: dict):
 @router.post("/query-secure")
 async def query_secure(request: dict):
     """
-    ZERO-STORAGE QUERY: Re-fetches text from Dropbox at query time.
+    ZERO-STORAGE QUERY with advanced retrieval pipeline.
+
+    Features:
+    - Query rewriting (expand/reformulate for better retrieval)
+    - Reranking (cross-encoder precision boost after re-fetch)
+    - Context shaping (token budget, deduplication)
+    - Zero-storage: Re-fetches text from Dropbox at query time
 
     Flow:
-    1. Generate query embedding
-    2. Search Pinecone for similar chunks (returns file paths + positions)
-    3. Re-fetch files from Dropbox using provided access token
-    4. Extract chunk text using stored positions
-    5. Send to LLM for answer generation
-    6. Return answer (text never stored)
+    1. Query rewriting (optional)
+    2. Generate query embedding(s)
+    3. Search Pinecone for similar chunks
+    4. Re-fetch files from Dropbox
+    5. Extract chunk text using stored positions
+    6. Rerank chunks (optional)
+    7. Shape context (token budget)
+    8. Send to LLM for answer generation
+    9. Return answer (text never stored)
     """
     from src.ingestion.embeddings import get_embedding
     from pinecone import Pinecone
@@ -264,34 +273,77 @@ async def query_secure(request: dict):
     access_token = request.get("access_token")
     top_k = request.get("top_k", 3)
 
+    # Advanced retrieval options
+    use_rewriting = request.get("use_rewriting", True)
+    use_reranking = request.get("use_reranking", True)
+    use_context_shaping = request.get("use_context_shaping", True)
+    token_budget = request.get("token_budget", 2000)
+
     if not query:
         return {"error": "No query provided", "answer": ""}
 
     if not access_token:
         return {"error": "Dropbox access token required for zero-storage queries", "answer": ""}
 
-    try:
-        # 1. Generate query embedding
-        query_embedding = get_embedding(query, provider="sentence-transformers", dim=384)
+    # Track pipeline metadata
+    pipeline_meta = {
+        "rewriting_enabled": use_rewriting,
+        "reranking_enabled": use_reranking,
+        "context_shaping_enabled": use_context_shaping
+    }
 
-        # 2. Search Pinecone
+    try:
+        # 1. Query rewriting (optional)
+        queries_to_search = [query]
+        if use_rewriting:
+            try:
+                from src.query.rewriter import rewrite_query
+                rewrite_result = rewrite_query(
+                    query=query,
+                    num_variants=2,
+                    strategy="expand",  # Fast, no LLM needed
+                    use_llm=False
+                )
+                queries_to_search = rewrite_result.rewritten_queries[:3]  # Max 3 variants
+                pipeline_meta["rewrite_strategy"] = rewrite_result.strategy_used
+                pipeline_meta["query_variants"] = len(queries_to_search)
+            except Exception as e:
+                pipeline_meta["rewrite_error"] = str(e)[:50]
+                queries_to_search = [query]
+
+        # 2. Search Pinecone with all query variants
         pc = Pinecone(api_key=cfg.PINECONE_API_KEY)
         idx_meta = pc.describe_index(cfg.PINECONE_INDEX_NAME)
         host = getattr(idx_meta, "host", None) or idx_meta.get("host")
         index = pc.Index(host=host)
 
-        results = index.query(
-            vector=query_embedding,
-            top_k=top_k,
-            include_metadata=True
-        )
+        # Fetch more results for reranking
+        fetch_k = top_k * 3 if use_reranking else top_k
 
-        if not results.matches:
-            return {"answer": "No relevant documents found.", "citations": []}
+        all_matches = []
+        seen_ids = set()
+
+        for q in queries_to_search:
+            query_embedding = get_embedding(q, provider="sentence-transformers", dim=384)
+            results = index.query(
+                vector=query_embedding,
+                top_k=fetch_k,
+                include_metadata=True
+            )
+            # Deduplicate across query variants
+            for match in results.matches:
+                if match.id not in seen_ids:
+                    seen_ids.add(match.id)
+                    all_matches.append(match)
+
+        if not all_matches:
+            return {"answer": "No relevant documents found.", "citations": [], "pipeline_meta": pipeline_meta}
+
+        pipeline_meta["initial_matches"] = len(all_matches)
 
         # 3. Group chunks by file for efficient fetching
         files_to_fetch = {}
-        for match in results.matches:
+        for match in all_matches:
             meta = match.metadata or {}
             file_path = meta.get("file_path", "")
             if file_path:
@@ -344,19 +396,56 @@ async def query_secure(request: dict):
                         })
 
         if not chunks_with_text:
-            return {"answer": "Could not retrieve document content. Please reconnect to Dropbox.", "citations": []}
+            return {"answer": "Could not retrieve document content. Please reconnect to Dropbox.", "citations": [], "pipeline_meta": pipeline_meta}
 
-        # Sort by score
+        # Sort by initial score
         chunks_with_text.sort(key=lambda x: x["score"], reverse=True)
 
-        # 5. Build prompt and call LLM
+        # 5. Reranking (optional) - now we have text, can use cross-encoder
+        if use_reranking and len(chunks_with_text) > 1:
+            try:
+                from src.retrieval.reranker import rerank_chunks
+                rerank_result = rerank_chunks(
+                    query=query,
+                    chunks=chunks_with_text,
+                    top_k=top_k * 2  # Keep more for context shaping
+                )
+                chunks_with_text = rerank_result.chunks
+                pipeline_meta["rerank_model"] = rerank_result.model_used
+                pipeline_meta["reranked"] = rerank_result.reranked
+            except Exception as e:
+                pipeline_meta["rerank_error"] = str(e)[:50]
+                # Continue with original order
+
+        # 6. Context shaping (optional) - token budget, dedup, pruning
+        if use_context_shaping:
+            try:
+                from src.context.shaper import shape_context
+                shape_result = shape_context(
+                    chunks=chunks_with_text,
+                    query=query,
+                    token_budget=token_budget,
+                    enable_pruning=True,
+                    enable_compression=False  # Keep original text for accuracy
+                )
+                chunks_with_text = shape_result.chunks[:top_k]
+                pipeline_meta["original_tokens"] = shape_result.original_tokens
+                pipeline_meta["final_tokens"] = shape_result.final_tokens
+                pipeline_meta["chunks_removed"] = shape_result.chunks_removed
+            except Exception as e:
+                pipeline_meta["shaping_error"] = str(e)[:50]
+                chunks_with_text = chunks_with_text[:top_k]
+        else:
+            chunks_with_text = chunks_with_text[:top_k]
+
+        # 7. Build prompt and call LLM
         from src.prompts.rag_prompt import build_rag_prompt
         from src.llm_providers import call_llm
 
         prompt = build_rag_prompt(query=query, chunks=chunks_with_text, k=top_k)
         llm_resp = call_llm(prompt=prompt, temperature=0.0, max_tokens=512)
 
-        # 6. Build response
+        # 8. Build response
         citations = [
             {"id": c["id"], "score": c["score"], "snippet": c["text"][:200]}
             for c in chunks_with_text[:top_k]
@@ -365,6 +454,7 @@ async def query_secure(request: dict):
         return {
             "answer": llm_resp.get("text", "").strip(),
             "citations": citations,
+            "pipeline_meta": pipeline_meta,
             "error": None
         }
 
@@ -372,6 +462,7 @@ async def query_secure(request: dict):
         return {
             "answer": "",
             "citations": [],
+            "pipeline_meta": pipeline_meta if 'pipeline_meta' in dir() else {},
             "error": str(e)
         }
 
