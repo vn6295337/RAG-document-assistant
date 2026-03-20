@@ -481,6 +481,55 @@ result = recover_from_qdrant(pinecone_index, backup_id="backup_20240315_120000")
 backups = list_backups()
 ```
 
+### **5.14 Change Detection (Dropbox Webhooks)**
+- **Files**:
+  - `aws/src/sync/dropbox_webhook.py` - Webhook verification and handling
+  - `aws/src/sync/change_tracker.py` - Delta sync with cursors
+  - `aws/src/api/webhook_routes.py` - API endpoints
+- **Purpose**: Automatic detection of file changes in Dropbox
+- **How it works**:
+  1. Register webhook URL in Dropbox App Console
+  2. Dropbox sends GET challenge for verification
+  3. On file changes, Dropbox sends POST notification
+  4. We use cursor-based delta sync to get actual changes
+  5. Changes are queued for re-indexing
+
+**Webhook Endpoints:**
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/webhook/dropbox` | GET | Verification challenge |
+| `/api/webhook/dropbox` | POST | Change notifications |
+| `/api/sync/status` | GET | Current sync status |
+| `/api/sync/init` | POST | Initialize cursor |
+| `/api/sync/check` | POST | Get changes since last sync |
+| `/api/sync/pending` | GET | List pending changes |
+| `/api/sync/mark-processed` | POST | Mark changes as processed |
+
+```python
+# Initialize sync (one-time setup)
+POST /api/sync/init
+{"access_token": "dropbox_token", "path": ""}
+
+# Check for changes
+POST /api/sync/check
+{"access_token": "dropbox_token"}
+# Returns: {"changes": [{"path": "/doc.pdf", "type": "modified"}]}
+
+# Get pending changes
+GET /api/sync/pending
+# Returns: {"pending": [...], "count": 3}
+
+# After re-indexing, mark as processed
+POST /api/sync/mark-processed
+{"paths": ["/doc.pdf"]}
+```
+
+**Dropbox App Console Setup:**
+1. Go to https://www.dropbox.com/developers/apps
+2. Select your app → Webhooks
+3. Add webhook URL: `https://ur1vowo3r2.execute-api.us-east-1.amazonaws.com/api/webhook/dropbox`
+4. Dropbox will verify with GET challenge
+
 ---
 
 ## 6. AWS Dockerfile Configuration
@@ -650,6 +699,7 @@ curl https://ur1vowo3r2.execute-api.us-east-1.amazonaws.com/api/health
 | Role-based access (RBAC) | `aws/src/security/rbac.py`               |
 | Embedding versioning     | `aws/src/retrieval/embedding_versioning.py` |
 | Backup/recovery (Qdrant) | `aws/src/backup/qdrant_backup.py`        |
+| Change detection         | `aws/src/sync/dropbox_webhook.py`        |
 
 ### 🔧 Remaining (Out of Scope)
 | Item                      | Priority | Notes                       |

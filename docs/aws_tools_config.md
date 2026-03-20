@@ -168,15 +168,15 @@ This document maps RAG pipeline stages to tools, services, and implementation st
 
 ## 9. Document Lifecycle Management
 
-| Step                      | Tool/Service            | Status | Notes                                 |
-| ------------------------- | ----------------------- | ------ | ------------------------------------- |
-| Stale reference detection | **StaleDetector**       | ✅      | `aws/src/retrieval/stale_detector.py` |
-| Change detection          | —                       | ❌      | No webhook/polling                    |
-| Re-indexing strategy      | Manual trigger          | ⚠️     | User-initiated only                   |
-| Embedding versioning      | **EmbeddingVersionManager** | ✅  | `aws/src/retrieval/embedding_versioning.py` |
-| Index cleanup/GC          | **IndexCleaner**        | ✅      | `aws/src/retrieval/index_cleanup.py`  |
-| Parser consistency        | Docling version pinning | ⚠️     | Not strictly enforced                 |
-| Backup and recovery       | **QdrantBackupManager** | ✅      | `aws/src/backup/qdrant_backup.py`     |
+| Step                      | Tool/Service                | Status | Notes                                       |
+| ------------------------- | --------------------------- | ------ | ------------------------------------------- |
+| Stale reference detection | **StaleDetector**           | ✅      | `aws/src/retrieval/stale_detector.py`       |
+| Change detection          | **Dropbox Webhooks**        | ✅      | `aws/src/sync/dropbox_webhook.py`           |
+| Re-indexing strategy      | Manual trigger              | ⚠️     | User-initiated only                         |
+| Embedding versioning      | **EmbeddingVersionManager** | ✅      | `aws/src/retrieval/embedding_versioning.py` |
+| Index cleanup/GC          | **IndexCleaner**            | ✅      | `aws/src/retrieval/index_cleanup.py`        |
+| Parser consistency        | Docling version pinning     | ⚠️     | Not strictly enforced                       |
+| Backup and recovery       | **QdrantBackupManager**     | ✅      | `aws/src/backup/qdrant_backup.py`           |
 
 **AWS Resources:** None
 
@@ -221,7 +221,9 @@ aws/
     ├── orchestrator_secure.py  # Secure orchestrator wrapper
     ├── api/
     │   ├── __init__.py
-    │   └── security_middleware.py  # Security middleware
+    │   ├── main.py             # FastAPI app with webhooks
+    │   ├── security_middleware.py  # Security middleware
+    │   └── webhook_routes.py   # Dropbox webhook endpoints
     ├── backup/
     │   ├── __init__.py
     │   └── qdrant_backup.py    # Qdrant backup/recovery
@@ -251,13 +253,17 @@ aws/
     ├── governance/
     │   ├── __init__.py
     │   └── token_budget.py     # Token/cost governance
-    └── security/
+    ├── security/
+    │   ├── __init__.py
+    │   ├── pii_handler.py      # Presidio PII detection
+    │   ├── input_guard.py      # Prompt injection defense
+    │   ├── output_guard.py     # Output moderation
+    │   ├── audit_logger.py     # CloudWatch audit logging
+    │   └── rbac.py             # Role-based access control
+    └── sync/
         ├── __init__.py
-        ├── pii_handler.py      # Presidio PII detection
-        ├── input_guard.py      # Prompt injection defense
-        ├── output_guard.py     # Output moderation
-        ├── audit_logger.py     # CloudWatch audit logging
-        └── rbac.py             # Role-based access control
+        ├── dropbox_webhook.py  # Webhook verification & handling
+        └── change_tracker.py   # Delta sync with cursors
 ```
 
 **Build:** `docker build -f aws/Dockerfile -t <image> .`
@@ -290,6 +296,7 @@ aws/
 21. ~~Role-based access~~ → `aws/src/security/rbac.py` (4 personas: viewer, analyst, editor, admin)
 22. ~~Embedding versioning~~ → `aws/src/retrieval/embedding_versioning.py`
 23. ~~Backup and recovery~~ → `aws/src/backup/qdrant_backup.py` (Pinecone ↔ Qdrant)
+24. ~~Change detection~~ → `aws/src/sync/dropbox_webhook.py` (Dropbox webhooks)
 
 ### 🔧 Remaining (Out of Scope)
-24. Custom domain + WAF (outside Free Tier)
+25. Custom domain + WAF (outside Free Tier)
