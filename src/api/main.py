@@ -17,9 +17,9 @@ except Exception as e:
     WEBHOOK_ERROR = f"{type(e).__name__}: {e}"
 
 app = FastAPI(
-    title="RAG Document Assistant API",
+    title="RAG Document Assistant API v2.2",
     description="Privacy-first RAG API with Zero-Storage",
-    version="2.1.0"
+    version="2.2.0"
 )
 
 # Configure CORS
