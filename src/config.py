@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 from dotenv import load_dotenv
 
 # Load local .env for development
@@ -11,54 +12,71 @@ try:
 except ImportError:
     _HAS_STREAMLIT = False
 
+# Support AWS SSM
+_SSM_CACHE = {}
+def get_from_ssm(key: str) -> Optional[str]:
+    """Fetch parameter from AWS SSM."""
+    if key in _SSM_CACHE:
+        return _SSM_CACHE[key]
+    
+    try:
+        import boto3
+        ssm = boto3.client('ssm', region_name=os.getenv('AWS_REGION', 'us-east-1'))
+        param_path = f"/rag_assistant/{key}"
+        response = ssm.get_parameter(Name=param_path, WithDecryption=True)
+        value = response['Parameter']['Value']
+        _SSM_CACHE[key] = value
+        return value
+    except Exception:
+        return None
+
 def get_required(key: str) -> str:
     """
-    Get required config value from environment or Streamlit secrets.
-    
-    Args:
-        key: Configuration key to retrieve
-        
-    Returns:
-        Configuration value
-        
-    Raises:
-        RuntimeError: If key is not found in any configuration source
+    Get required config value from environment, Streamlit secrets, or AWS SSM.
     """
-    # Try Streamlit secrets first (for Streamlit Cloud)
+    # 1. Try environment variables
+    value = os.getenv(key)
+    if value:
+        return value
+
+    # 2. Try Streamlit secrets
     if _HAS_STREAMLIT and hasattr(st, 'secrets'):
         try:
             if key in st.secrets:
                 return st.secrets[key]
         except Exception:
-            pass  # Secrets not configured, fall back to env vars
+            pass
 
-    # Fall back to environment variables (for local/other deployments)
-    value = os.getenv(key)
-    if not value:
-        raise RuntimeError(f"Missing required environment variable: {key}")
-    return value
+    # 3. Try AWS SSM (Production)
+    value = get_from_ssm(key)
+    if value:
+        return value
+
+    raise RuntimeError(f"Missing required configuration: {key}")
 
 def get_optional(key: str, default=None):
     """
-    Get optional config value from environment or Streamlit secrets.
-    
-    Args:
-        key: Configuration key to retrieve
-        default: Default value if key is not found
-        
-    Returns:
-        Configuration value or default
+    Get optional config value from environment, Streamlit secrets, or AWS SSM.
     """
-    # Try Streamlit secrets first
+    # 1. Try environment variables
+    value = os.getenv(key)
+    if value:
+        return value
+
+    # 2. Try Streamlit secrets
     if _HAS_STREAMLIT and hasattr(st, 'secrets'):
         try:
             if key in st.secrets:
                 return st.secrets[key]
         except Exception:
-            pass  # Secrets not configured, fall back to env vars
+            pass
 
-    # Fall back to environment variables
-    return os.getenv(key, default)
+    # 3. Try AWS SSM
+    value = get_from_ssm(key)
+    if value:
+        return value
+
+    return default
 
 # Pinecone (Required)
 PINECONE_API_KEY = get_required("PINECONE_API_KEY")
