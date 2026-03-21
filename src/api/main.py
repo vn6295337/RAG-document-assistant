@@ -1,28 +1,27 @@
 """FastAPI application for RAG backend."""
 
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.api.routes import router
 
+# Try to import webhook routes (AWS track only)
+try:
+    from src.api.webhook_routes import router as webhook_router
+    HAS_WEBHOOKS = True
+except ImportError:
+    HAS_WEBHOOKS = False
+
 app = FastAPI(
     title="RAG Document Assistant API",
-    description="REST API for RAG-based document querying",
-    version="1.0.0"
+    description="Privacy-first RAG API with Zero-Storage",
+    version="2.1.0"
 )
 
-# CORS middleware for React frontend
-# Allow Vercel deployments and local development
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:5175",
-    ],
-    allow_origin_regex=r"https://.*\.(vercel\.app|hf\.space)",
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,7 +30,16 @@ app.add_middleware(
 # Include API routes
 app.include_router(router, prefix="/api")
 
+# Include webhook routes if available (AWS track)
+if HAS_WEBHOOKS:
+    app.include_router(webhook_router, prefix="/api")
+
 
 @app.get("/")
 async def root():
-    return {"message": "RAG Document Assistant API", "docs": "/docs"}
+    return {
+        "message": "RAG Document Assistant API",
+        "docs": "/docs",
+        "webhooks": HAS_WEBHOOKS,
+        "env": os.getenv("ENV", "development")
+    }
