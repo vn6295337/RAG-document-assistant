@@ -1,0 +1,3 @@
+[console_scripts]
+rag-ingest = src.ingestion.cli_ingest:main
+rag-search = src.ingestion.search_local:main

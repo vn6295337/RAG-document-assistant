@@ -16,11 +16,14 @@ class IngestRequest(BaseModel):
     docs_dir: str
     output_path: str = "data/chunks.jsonl"
     provider: str = "sentence-transformers"
+    use_docling: bool = True
+    use_structure: bool = True
 
 
 class SyncRequest(BaseModel):
     chunks_path: str = "data/chunks.jsonl"
     batch_size: int = 100
+    store_text: bool = False  # Default to False for Zero-Storage privacy compliance
 
 
 # Response models

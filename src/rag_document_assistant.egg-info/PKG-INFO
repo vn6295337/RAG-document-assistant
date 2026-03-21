@@ -1,0 +1,155 @@
+Metadata-Version: 2.4
+Name: rag-document-assistant
+Version: 0.1.0
+Summary: Production-ready RAG system delivering 100% retrieval accuracy with zero infrastructure costs
+Author-email: AI Portfolio <vn6295337@gmail.com>
+License: MIT
+Project-URL: Homepage, https://github.com/vn6295337/RAG-document-assistant
+Project-URL: Repository, https://github.com/vn6295337/RAG-document-assistant
+Project-URL: Issues, https://github.com/vn6295337/RAG-document-assistant/issues
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Information Technology
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: Topic :: Text Processing :: Indexing
+Classifier: Topic :: Text Processing :: Linguistic
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: streamlit>=1.40.0
+Requires-Dist: pinecone>=5.0.0
+Requires-Dist: sentence-transformers>=2.2.0
+Requires-Dist: requests>=2.31.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: torch
+Provides-Extra: dev
+Requires-Dist: pytest>=6.0; extra == "dev"
+Requires-Dist: black>=21.0; extra == "dev"
+Requires-Dist: flake8>=3.9; extra == "dev"
+Requires-Dist: mypy>=0.910; extra == "dev"
+Dynamic: license-file
+
+---
+title: RAG Document Assistant
+emoji: 🔒
+colorFrom: green
+colorTo: blue
+sdk: docker
+pinned: false
+license: mit
+app_port: 7860
+short_description: Privacy-first document search with zero storage
+---
+
+# RAG Document Assistant
+
+**Privacy-first document search. Your data never leaves your device.**
+
+[![Privacy](https://img.shields.io/badge/Privacy-Zero%20Storage-green)](#privacy-first-architecture)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+| Resource | Link |
+|----------|------|
+| Live Demo | [rag-document-assistant.vercel.app](https://rag-document-assistant.vercel.app/) |
+| Product Demo Video | [Pre-recorded Demo](https://github.com/vn6295337/RAG-document-assistant/issues/2) |
+| Business Guide | [BUSINESS_README.md](BUSINESS_README.md) |
+
+---
+
+## Privacy-First Architecture
+
+```
+INDEXING (one-time)
+───────────────────────────────────────────────────────────
+Your Device                           Server
+───────────────────────────────────────────────────────────
+  Dropbox ──→ Files loaded
+              in browser
+                 │
+                 ▼
+           Text chunked ─────────────→ Embeddings +
+           locally                     file positions only
+                 │                     (no text stored)
+                 ▼
+           Original text
+           PURGED ✓
+───────────────────────────────────────────────────────────
+
+QUERY TIME (every search)
+───────────────────────────────────────────────────────────
+Your Question ──→ Find matching ──→ Re-fetch text
+                  embeddings        from YOUR Dropbox
+                       │                  │
+                       ▼                  ▼
+                  File paths ───→ Extract chunks ──→ Answer
+                  + positions     using positions    generated
+───────────────────────────────────────────────────────────
+```
+
+### True Zero-Storage Privacy
+
+1. **Client-Side Chunking**: Documents are read and chunked entirely in your browser
+2. **Embeddings Only**: Only mathematical vectors are stored (irreversible)
+3. **No Text Stored**: Only file paths and character positions are kept
+4. **Query-Time Re-fetch**: Text is retrieved fresh from YOUR Dropbox for each query
+5. **You Control Access**: Disconnect Dropbox = queries stop working = your data stays yours
+
+## How It Works
+
+1. **Connect** - Link your Dropbox account (OAuth - we never see your password)
+2. **Select** - Choose files to index (.txt, .md, .pdf up to 5 MB)
+3. **Process** - Text is chunked and embedded in your browser
+4. **Search** - Query your documents with natural language
+5. **Answer** - Get cited responses from your indexed content
+
+## What Gets Stored
+
+| Data | Stored? | Where |
+|------|---------|-------|
+| Your files | No | Stay in YOUR Dropbox |
+| Document text | No | Re-fetched at query time |
+| Embeddings | Yes | Pinecone (encrypted) |
+| File paths | Yes | Pinecone metadata |
+| Chunk positions | Yes | Pinecone metadata |
+| Queries | No | Not logged |
+
+Embeddings are mathematical vectors that cannot be reversed to reconstruct text. File paths and positions are used to re-fetch the exact text from your Dropbox when you search.
+
+## Quick Start
+
+```bash
+git clone https://github.com/vn6295337/RAG-document-assistant.git
+cd RAG-document-assistant
+
+# Backend
+pip install -r requirements.txt
+uvicorn src.api.main:app --reload
+
+# Frontend
+cd frontend && npm install && npm run dev
+```
+
+## Tech Stack
+
+- **Frontend**: React + Vite + Tailwind CSS
+- **Backend**: FastAPI on HuggingFace Spaces
+- **Vector DB**: Pinecone (embeddings only)
+- **File Source**: Dropbox OAuth
+- **LLM**: Multi-provider fallback (Gemini, Groq, OpenRouter)
+
+## Documentation
+
+- [Architecture](docs/architecture.md) - Technical design
+- [API Reference](docs/api_reference.md) - Backend endpoints
+- [Business Overview](BUSINESS_README.md) - Use cases and value
+
+## License
+
+MIT License - see [LICENSE](LICENSE)

@@ -1,0 +1,12 @@
+streamlit>=1.40.0
+pinecone>=5.0.0
+sentence-transformers>=2.2.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+torch
+
+[dev]
+pytest>=6.0
+black>=21.0
+flake8>=3.9
+mypy>=0.910

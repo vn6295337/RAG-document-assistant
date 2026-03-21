@@ -191,7 +191,8 @@ def ingest_from_directory(
 def sync_to_pinecone(
     chunks_path: str = "data/chunks.jsonl",
     index_name: str = None,
-    batch_size: int = 100
+    batch_size: int = 100,
+    store_text: bool = False
 ) -> SyncResult:
     """
     Upload embeddings from chunks.jsonl to Pinecone.
@@ -200,6 +201,7 @@ def sync_to_pinecone(
         chunks_path: Path to chunks.jsonl file
         index_name: Pinecone index name (uses config default if None)
         batch_size: Number of vectors to upsert per batch
+        store_text: Whether to store chunk text in Pinecone metadata (False for Zero-Storage)
 
     Returns:
         SyncResult with status and count
@@ -259,14 +261,22 @@ def sync_to_pinecone(
             if not embedding:
                 continue
 
+            # Build metadata
+            metadata = {
+                "filename": chunk.get("filename", ""),
+                "chunk_id": chunk.get("chunk_id", 0),
+                "element_type": chunk.get("element_type", "text"),
+                "section_heading": chunk.get("section_heading", "")
+            }
+            
+            # Only include text if explicitly requested (Zero-Storage compliance)
+            if store_text:
+                metadata["text"] = chunk.get("text", "")[:1000]
+
             vectors.append({
                 "id": chunk["id"],
                 "values": embedding,
-                "metadata": {
-                    "filename": chunk.get("filename", ""),
-                    "chunk_id": chunk.get("chunk_id", 0),
-                    "text": chunk.get("text", "")[:1000]  # Limit metadata size
-                }
+                "metadata": metadata
             })
 
         # Upsert in batches

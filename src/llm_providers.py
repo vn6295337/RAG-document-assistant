@@ -1,313 +1,138 @@
-
 # src/llm_providers.py
-# Priority: GEMINI → GROQ → OPENROUTER → fallback
-
 import os
-import json
 import time
-from typing import Optional, Dict, Any
+import logging
+from typing import Optional, Dict, Any, List
+from litellm import completion
 
-try:
-    import requests
-    _HAS_REQUESTS = True
-except Exception:
-    import urllib.request as _urllib_request
-    import urllib.error as _urllib_error
-    _HAS_REQUESTS = False
+logger = logging.getLogger(__name__)
 
+# Model mapping for LiteLLM
+# LiteLLM uses prefixes like "gemini/", "groq/", "openrouter/"
+PROVIDER_MAP = {
+    "gemini": "gemini/",
+    "groq": "groq/",
+    "openrouter": "openrouter/"
+}
 
-def _http_post(url: str, headers: dict, payload: dict, timeout: int = 30):
+def call_llm(
+    prompt: str,
+    context: Optional[str] = None,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    temperature: float = 0.0,
+    max_tokens: int = 512,
+    **kwargs
+) -> Dict[str, Any]:
     """
-    Perform HTTP POST request with JSON payload.
+    Unified LLM call using LiteLLM.
     
     Args:
-        url: Target URL
-        headers: HTTP headers
-        payload: JSON-serializable payload
-        timeout: Request timeout in seconds
+        prompt: User question
+        context: Retrieved document context
+        provider: 'gemini', 'groq', or 'openrouter' (default: priority cascade)
+        model: Specific model name (optional)
+        temperature: Sampling temperature
+        max_tokens: Max output tokens
         
     Returns:
-        Parsed JSON response
-        
-    Raises:
-        requests.RequestException: If using requests and request fails
-        urllib.error.URLError: If using urllib and request fails
-        json.JSONDecodeError: If response is not valid JSON
-        ValueError: If url is empty or payload is not serializable
+        Dict with 'text' and 'meta'
     """
-    if not url:
-        raise ValueError("URL cannot be empty")
-        
-    try:
-        data = json.dumps(payload).encode("utf-8")
-    except Exception as e:
-        raise ValueError(f"Failed to serialize payload to JSON: {str(e)}")
-        
-    if _HAS_REQUESTS:
-        try:
-            r = requests.post(url, headers=headers, data=json.dumps(payload), timeout=timeout)
-            r.raise_for_status()
-            return r.json()
-        except requests.RequestException:
-            raise
-        except json.JSONDecodeError as e:
-            raise json.JSONDecodeError(f"Failed to decode JSON response: {str(e)}")
-    else:
-        try:
-            req = _urllib_request.Request(url, data=data, headers=headers, method="POST")
-            with _urllib_request.urlopen(req, timeout=timeout) as resp:
-                response_data = resp.read().decode("utf-8")
-                return json.loads(response_data)
-        except _urllib_error.URLError:
-            raise
-        except json.JSONDecodeError as e:
-            raise json.JSONDecodeError(f"Failed to decode JSON response: {str(e)}")
+    # 1. Determine provider and model from environment if not provided
+    if not provider:
+        if os.getenv("GEMINI_API_KEY"):
+            provider = "gemini"
+        elif os.getenv("GROQ_API_KEY"):
+            provider = "groq"
+        else:
+            provider = "openrouter"
 
+    if not model:
+        if provider == "gemini":
+            model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        elif provider == "groq":
+            model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+        else:
+            model = os.getenv("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct:free")
 
-# GEMINI ------------------------------------------------------------
+    # 2. Build LiteLLM model string
+    litellm_model = f"{PROVIDER_MAP.get(provider, '')}{model}"
 
-def _call_gemini(prompt: str, temperature: float, max_tokens: int, context: Optional[str]):
-    """
-    Call Gemini API with prompt and context.
-    
-    Args:
-        prompt: User prompt
-        temperature: Sampling temperature (0.0-1.0)
-        max_tokens: Maximum tokens to generate
-        context: Additional context for the prompt
-        
-    Returns:
-        Dict with 'text' and 'meta' keys
-        
-    Raises:
-        RuntimeError: If GEMINI_API_KEY is not set
-        Exception: If API call fails
-    """
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise RuntimeError("GEMINI_API_KEY missing")
-
-    model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-
-    content = prompt
+    # 3. Construct messages
+    messages = []
+    system_content = "You are a helpful assistant that answers questions based on the provided context."
     if context:
-        content = f"Context:\n{context}\n\nUser question:\n{prompt}"
+        system_content += f"\n\nContext:\n{context}"
+    
+    messages.append({"role": "system", "content": system_content})
+    messages.append({"role": "user", "content": prompt})
 
-    payload = {
-        "contents": [{"parts": [{"text": content}]}],
-        "generationConfig": {
-            "temperature": float(temperature),
-            "maxOutputTokens": int(max_tokens)
+    # 4. Execute call
+    start_time = time.time()
+    try:
+        response = completion(
+            model=litellm_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs
+        )
+        
+        text = response.choices[0].message.content
+        elapsed = time.time() - start_time
+        
+        return {
+            "text": text,
+            "meta": {
+                "provider": provider,
+                "model": model,
+                "elapsed_s": elapsed,
+                "usage": dict(response.get("usage", {}))
+            }
         }
-    }
-
-    start = time.time()
-    try:
-        j = _http_post(url, {"Content-Type": "application/json"}, payload)
     except Exception as e:
-        raise RuntimeError(f"Gemini API call failed: {str(e)}")
-    elapsed = time.time() - start
+        logger.error(f"LiteLLM call failed for {litellm_model}: {str(e)}")
+        return {
+            "text": "",
+            "meta": {"error": str(e), "provider": provider, "model": model}
+        }
 
-    try:
-        text = j["candidates"][0]["content"]["parts"][0]["text"]
-    except (KeyError, IndexError, TypeError) as e:
-        text = json.dumps(j)[:1000]
-        raise RuntimeError(f"Unexpected Gemini API response format: {str(e)}. Response: {text}")
-
-    return {"text": text, "meta": {"provider": "gemini", "model": model, "elapsed_s": elapsed}}
-
-
-# GROQ --------------------------------------------------------------
-
-def _call_groq(prompt: str, temperature: float, max_tokens: int, context: Optional[str]):
+def call_llm_stream(
+    prompt: str,
+    context: Optional[str] = None,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    temperature: float = 0.0,
+    max_tokens: int = 512,
+    **kwargs
+):
     """
-    Call Groq API with prompt and context.
+    Streaming version of unified LLM call.
+    Yields chunks of text.
+    """
+    # Logic similar to call_llm but returns a generator
+    if not provider:
+        provider = "gemini" if os.getenv("GEMINI_API_KEY") else "groq"
     
-    Args:
-        prompt: User prompt
-        temperature: Sampling temperature (0.0-1.0)
-        max_tokens: Maximum tokens to generate
-        context: Additional context for the prompt
-        
-    Returns:
-        Dict with 'text' and 'meta' keys
-        
-    Raises:
-        RuntimeError: If GROQ_API_KEY is not set
-        Exception: If API call fails
-    """
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise RuntimeError("GROQ_API_KEY missing")
+    if not model:
+        model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash") if provider == "gemini" else os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    model = os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")
+    litellm_model = f"{PROVIDER_MAP.get(provider, '')}{model}"
 
-    system_msg = "You are a concise assistant. Include citations if context is provided."
-    messages = [
-        {"role": "system", "content": system_msg},
-        {"role": "user", "content": f"Context:\n{context}\n\n{prompt}" if context else prompt}
-    ]
+    messages = [{"role": "user", "content": f"Context:\n{context}\n\nQuestion: {prompt}" if context else prompt}]
 
-    payload = {
-        "model": model,
-        "messages": messages,
-        "temperature": float(temperature),
-        "max_tokens": int(max_tokens)
-    }
-
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-
-    start = time.time()
     try:
-        j = _http_post(url, headers, payload)
+        response = completion(
+            model=litellm_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=True,
+            **kwargs
+        )
+        for chunk in response:
+            content = chunk.choices[0].delta.content
+            if content:
+                yield content
     except Exception as e:
-        raise RuntimeError(f"Groq API call failed: {str(e)}")
-    elapsed = time.time() - start
-
-    try:
-        text = j["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as e:
-        text = json.dumps(j)[:1000]
-        raise RuntimeError(f"Unexpected Groq API response format: {str(e)}. Response: {text}")
-
-    return {"text": text, "meta": {"provider": "groq", "model": model, "elapsed_s": elapsed}}
-
-
-# OPENROUTER --------------------------------------------------------
-
-def _call_openrouter(prompt: str, temperature: float, max_tokens: int, context: Optional[str]):
-    """
-    Call OpenRouter API with prompt and context.
-    
-    Args:
-        prompt: User prompt
-        temperature: Sampling temperature (0.0-1.0)
-        max_tokens: Maximum tokens to generate
-        context: Additional context for the prompt
-        
-    Returns:
-        Dict with 'text' and 'meta' keys
-        
-    Raises:
-        RuntimeError: If OPENROUTER_API_KEY is not set
-        Exception: If API call fails
-    """
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY missing")
-
-    url = os.getenv("OPENROUTER_URL", "https://api.openrouter.ai/v1/chat/completions")
-    model = os.getenv("OPENROUTER_MODEL", "gpt-4o-mini")
-
-    system_msg = "You are a concise assistant. Use supplied context."
-
-    user_content = f"Context:\n{context}\n\n{prompt}" if context else prompt
-    messages = [
-        {"role": "system", "content": system_msg},
-        {"role": "user", "content": user_content}
-    ]
-
-    payload = {
-        "model": model,
-        "messages": messages,
-        "temperature": float(temperature),
-        "max_tokens": int(max_tokens)
-    }
-
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-
-    start = time.time()
-    try:
-        j = _http_post(url, headers, payload)
-    except Exception as e:
-        raise RuntimeError(f"OpenRouter API call failed: {str(e)}")
-    elapsed = time.time() - start
-
-    try:
-        text = j["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as e:
-        text = json.dumps(j)[:1000]
-        raise RuntimeError(f"Unexpected OpenRouter API response format: {str(e)}. Response: {text}")
-
-    return {"text": text, "meta": {"provider": "openrouter", "model": model, "elapsed_s": elapsed}}
-
-
-# FALLBACK ----------------------------------------------------------
-
-def _fallback(prompt: str, context: Optional[str]):
-    """
-    Simple fallback responder when all LLM providers fail.
-    
-    Args:
-        prompt: User prompt
-        context: Additional context
-        
-    Returns:
-        Dict with 'text' and 'meta' keys
-    """
-    ctx = (context or "")[:800]
-    text = f"[offline] {prompt}\n\nContext snippet:\n{ctx}"
-    return {"text": text, "meta": {"provider": "local-fallback"}}
-
-
-# PUBLIC ENTRYPOINT -------------------------------------------------
-
-def call_llm(prompt: str, temperature: float = 0.0, max_tokens: int = 512, context: Optional[str] = None, **kwargs):
-    """
-    Call LLM with automatic fallback cascade: Gemini → Groq → OpenRouter → Local.
-    If one provider fails, automatically tries the next one.
-    
-    Args:
-        prompt: User prompt
-        temperature: Sampling temperature (0.0-1.0)
-        max_tokens: Maximum tokens to generate
-        context: Additional context for the prompt
-        **kwargs: Additional arguments passed to provider functions
-        
-    Returns:
-        Dict with 'text' and 'meta' keys containing the response and metadata
-        
-    Raises:
-        Exception: If all providers fail
-    """
-    if not prompt or not isinstance(prompt, str):
-        raise ValueError("prompt must be a non-empty string")
-        
-    # Validate temperature and max_tokens
-    temperature = max(0.0, min(1.0, float(temperature)))  # Clamp to [0.0, 1.0]
-    max_tokens = max(1, int(max_tokens))  # Ensure positive
-    
-    errors = []
-
-    # Try Gemini first
-    if os.getenv("GEMINI_API_KEY"):
-        try:
-            return _call_gemini(prompt, temperature, max_tokens, context)
-        except Exception as e:
-            errors.append(f"gemini: {str(e)}")
-            # Continue to next provider
-
-    # Try Groq second
-    if os.getenv("GROQ_API_KEY"):
-        try:
-            return _call_groq(prompt, temperature, max_tokens, context)
-        except Exception as e:
-            errors.append(f"groq: {str(e)}")
-            # Continue to next provider
-
-    # Try OpenRouter third
-    if os.getenv("OPENROUTER_API_KEY"):
-        try:
-            return _call_openrouter(prompt, temperature, max_tokens, context)
-        except Exception as e:
-            errors.append(f"openrouter: {str(e)}")
-            # Continue to fallback
-
-    # All providers failed, use local fallback
-    error_summary = "; ".join(errors) if errors else "No API keys configured"
-    return {
-        "text": f"[All providers failed: {error_summary}] Using local fallback.",
-        "meta": {"provider": "local-fallback", "errors": errors}
-    }
+        yield f"Error: {str(e)}"

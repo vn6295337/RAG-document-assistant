@@ -18,30 +18,24 @@ import re
 import logging
 from typing import List, Dict, Optional
 
+from src.ingestion.cleaner import get_cleaner
+
 logger = logging.getLogger(__name__)
+
+# Initialize global cleaner
+text_cleaner = get_cleaner()
 
 def _clean_markdown(text: str) -> str:
     """
-    Clean markdown text by removing code blocks, HTML tags, and other non-content elements.
+    Clean text using the robust TextCleaner.
     
     Args:
-        text: Raw markdown text to clean
+        text: Raw text to clean
         
     Returns:
-        Cleaned text with markdown syntax removed
+        Cleaned text
     """
-    # Remove code fences and their contents
-    text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
-    # Remove HTML tags
-    text = re.sub(r"<[^>]+>", " ", text)
-    # Remove images/links syntax but keep alt/text
-    text = re.sub(r"!\[([^\]]*)\]\([^\)]*\)", r"\1", text)
-    text = re.sub(r"\[([^\]]+)\]\([^\)]*\)", r"\1", text)
-    # Remove front-matter delimited by --- at top
-    text = re.sub(r"^---.*?---\s*", " ", text, flags=re.DOTALL)
-    # Collapse whitespace
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    return text_cleaner.clean_text(text, is_markdown=True)
 
 def load_markdown_docs(dir_path: str, ext: str = ".md", max_chars: int = 20000) -> List[Dict]:
     """
