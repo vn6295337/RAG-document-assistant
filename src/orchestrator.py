@@ -35,21 +35,22 @@ def _enrich_citations_with_snippets(result: dict, chunk_map: dict):
                 c["snippet"] = s
     return result
 
-def _load_chunks_map(path: str = "data/chunks.jsonl") -> dict:
+def _load_chunks_map(path: str = None) -> dict:
     """
     Load chunks map from JSONL file for citation enrichment.
-    
-    Args:
-        path: Path to JSONL file containing chunk data
-        
-    Returns:
-        Dictionary mapping chunk IDs to text content
     """
+    if path is None:
+        path = "data/chunks.jsonl"
+        # In production, default to /tmp if the bundled one doesn't exist
+        if os.getenv("ENV") == "production" and not os.path.exists(path):
+            if os.path.exists("/tmp/chunks.jsonl"):
+                path = "/tmp/chunks.jsonl"
+
     m = {}
     pth = _Path(path)
     if not pth.exists():
         return m
-        
+
     try:
         with pth.open("r", encoding="utf-8") as fh:
             for line_num, line in enumerate(fh, 1):
@@ -59,9 +60,8 @@ def _load_chunks_map(path: str = "data/chunks.jsonl") -> dict:
                 try:
                     obj = json.loads(line)
                 except json.JSONDecodeError:
-                    # Skip malformed JSON lines
                     continue
-                    
+
                 cid = obj.get("id") or obj.get("chunk_id") or None
                 if not cid and "filename" in obj and "chunk_id" in obj:
                     cid = f"{obj['filename']}::{obj['chunk_id']}"
@@ -69,14 +69,16 @@ def _load_chunks_map(path: str = "data/chunks.jsonl") -> dict:
                 if cid:
                     m[str(cid)] = text
     except Exception as e:
-        # Don't fail if chunks file can't be loaded
         pass
-        
+
     return m
 
+import os
 _CHUNKS_MAP = _load_chunks_map()
 _CURRENT_CHUNKS_PATH = "data/chunks.jsonl"
-
+if os.getenv("ENV") == "production" and not os.path.exists(_CURRENT_CHUNKS_PATH):
+    if os.path.exists("/tmp/chunks.jsonl"):
+        _CURRENT_CHUNKS_PATH = "/tmp/chunks.jsonl"
 
 def set_chunks_path(path: str) -> int:
     """
@@ -641,3 +643,239 @@ def orchestrate_advanced(
                 "trace": tracer.to_dict()
             }
         raise
+
+
+from langfuse.decorators import observe, langfuse_context
+
+async def _dummy_async():
+    pass
+
+@observe()
+async def orchestrate_zero_storage(
+    query: str,
+    access_token: str,
+    top_k: int = 3,
+    use_rewriting: bool = True,
+    rewrite_strategy: str = "auto",
+    use_reranking: bool = True,
+    use_context_shaping: bool = True,
+    token_budget: int = 2000,
+    llm_params: Dict[str, Any] = None
+) -> Dict[str, Any]:
+    """
+    Unified Zero-Storage RAG orchestration.
+    
+    This function re-fetches document text from Dropbox at query time,
+    ensuring no raw text is stored on the server.
+    
+    Features:
+    - Query rewriting (LiteLLM-ready)
+    - Hybrid-Cloud compatible (Offloads embeddings)
+    - Zero-storage: RAM-only re-fetching
+    - Context shaping & Reranking
+    """
+    import httpx
+    from pinecone import Pinecone
+    from src.ingestion.embeddings import get_embedding
+    from src.llm_providers import call_llm
+    
+    if not query:
+        return {"error": "No query provided", "answer": ""}
+    
+    if not access_token:
+        return {"error": "Dropbox access token required for zero-storage queries", "answer": ""}
+        
+    if llm_params is None:
+        llm_params = {"temperature": 0.0, "max_tokens": 512}
+
+    langfuse_context.update_current_trace(
+        name="Zero-Storage Query",
+        input=query,
+        metadata={
+            "top_k": top_k,
+            "use_rewriting": use_rewriting,
+            "rewrite_strategy": rewrite_strategy
+        }
+    )
+
+    # Track pipeline metadata
+    pipeline_meta = {
+        "rewriting_enabled": use_rewriting,
+        "rewrite_strategy_requested": rewrite_strategy,
+        "reranking_enabled": use_reranking,
+        "context_shaping_enabled": use_context_shaping
+    }
+
+    try:
+        # 1. Query rewriting (optional)
+        queries_to_search = [query]
+        rewrite_result: Optional[QueryRewriteResult] = None
+        if use_rewriting and rewrite_strategy != "none":
+            try:
+                rewrite_result = rewrite_query(
+                    query=query,
+                    num_variants=3,
+                    strategy=rewrite_strategy,
+                    use_llm=(rewrite_strategy != "expand")
+                )
+                queries_to_search = rewrite_result.rewritten_queries[:4]
+                pipeline_meta["rewrite_strategy"] = rewrite_result.strategy_used
+                pipeline_meta["query_variants"] = len(queries_to_search)
+                pipeline_meta["rewritten_queries"] = queries_to_search
+            except Exception as e:
+                pipeline_meta["rewrite_error"] = str(e)[:100]
+                queries_to_search = [query]
+
+        # 2. Search Pinecone with all query variants
+        pc = Pinecone(api_key=cfg.PINECONE_API_KEY)
+        idx_meta = pc.describe_index(cfg.PINECONE_INDEX_NAME)
+        host = getattr(idx_meta, "host", None) or idx_meta.get("host")
+        index = pc.Index(host=host)
+
+        # Fetch more results for reranking
+        fetch_k = top_k * 3 if use_reranking else top_k
+
+        all_matches = []
+        seen_ids = set()
+
+        for q in queries_to_search:
+            query_embedding = get_embedding(q, provider="sentence-transformers", dim=384)
+            results = index.query(
+                vector=query_embedding,
+                top_k=fetch_k,
+                include_metadata=True
+            )
+            # Deduplicate across query variants
+            for match in results.matches:
+                if match.id not in seen_ids:
+                    seen_ids.add(match.id)
+                    all_matches.append(match)
+
+        if not all_matches:
+            return {"answer": "No relevant documents found.", "citations": [], "pipeline_meta": pipeline_meta}
+
+        pipeline_meta["initial_matches"] = len(all_matches)
+
+        # 3. Group chunks by file for efficient fetching
+        files_to_fetch = {}
+        for match in all_matches:
+            meta = match.metadata or {}
+            file_path = meta.get("file_path", "")
+            if file_path:
+                if file_path not in files_to_fetch:
+                    files_to_fetch[file_path] = []
+                files_to_fetch[file_path].append({
+                    "id": match.id,
+                    "score": match.score,
+                    "start_char": meta.get("start_char", 0),
+                    "end_char": meta.get("end_char", 0),
+                    "filename": meta.get("filename", ""),
+                })
+
+        # 4. Re-fetch files from Dropbox and extract chunks
+        chunks_with_text = []
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            for file_path, chunks in files_to_fetch.items():
+                # Fetch file content
+                response = await client.post(
+                    "https://content.dropboxapi.com/2/files/download",
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Dropbox-API-Arg": f'{{"path": "{file_path}"}}'
+                    }
+                )
+
+                if response.status_code == 200:
+                    # Use Docling (zero-disk) for consistent text extraction and offset matching
+                    try:
+                        from src.ingestion.docling_loader import load_document_from_bytes
+                        from pathlib import Path
+                        filename = Path(file_path).name
+                        doc = load_document_from_bytes(response.content, filename)
+                        
+                        if doc.status == "OK" and doc.full_text.strip():
+                            file_content = doc.full_text
+                        else:
+                            # Fallback for plain text or failures
+                            file_content = response.text
+                    except Exception as e:
+                        pipeline_meta["re-fetch_parse_error"] = str(e)[:100]
+                        file_content = response.text
+
+                    # Extract each chunk using stored positions
+                    for chunk in chunks:
+                        start = chunk["start_char"]
+                        end = chunk["end_char"]
+                        chunk_text = file_content[start:end] if end > start else file_content[:500]
+                        chunks_with_text.append({
+                            "id": chunk["id"],
+                            "score": chunk["score"],
+                            "text": chunk_text.strip(),
+                            "filename": chunk["filename"],
+                        })
+
+        if not chunks_with_text:
+            return {"answer": "Could not retrieve document content. Please reconnect to Dropbox.", "citations": [], "pipeline_meta": pipeline_meta}
+
+        # Sort by initial score
+        chunks_with_text.sort(key=lambda x: x["score"], reverse=True)
+
+        # 5. Reranking (optional) - now we have text, can use cross-encoder
+        if use_reranking and len(chunks_with_text) > 1:
+            try:
+                rerank_result = rerank_chunks(
+                    query=query,
+                    chunks=chunks_with_text,
+                    top_k=top_k * 2  # Keep more for context shaping
+                )
+                chunks_with_text = rerank_result.chunks
+                pipeline_meta["rerank_model"] = rerank_result.model_used
+                pipeline_meta["reranked"] = rerank_result.reranked
+            except Exception as e:
+                pipeline_meta["rerank_error"] = str(e)[:50]
+                # Continue with original order
+
+        # 6. Context shaping (optional) - token budget, dedup, pruning
+        if use_context_shaping:
+            try:
+                shape_result = shape_context(
+                    chunks=chunks_with_text,
+                    query=query,
+                    token_budget=token_budget,
+                    enable_pruning=True,
+                    enable_compression=False  # Keep original text for accuracy
+                )
+                chunks_with_text = shape_result.chunks[:top_k]
+                pipeline_meta["original_tokens"] = shape_result.original_tokens
+                pipeline_meta["final_tokens"] = shape_result.final_tokens
+                pipeline_meta["chunks_removed"] = shape_result.chunks_removed
+            except Exception as e:
+                pipeline_meta["shaping_error"] = str(e)[:50]
+                chunks_with_text = chunks_with_text[:top_k]
+        else:
+            chunks_with_text = chunks_with_text[:top_k]
+
+        # 7. Build prompt and call LLM
+        prompt = build_rag_prompt(query=query, chunks=chunks_with_text, k=top_k)
+        llm_resp = call_llm(prompt=prompt, **llm_params)
+
+        # 8. Build response
+        citations = [
+            {"id": c["id"], "score": c["score"], "snippet": c["text"][:200]}
+            for c in chunks_with_text[:top_k]
+        ]
+
+        return {
+            "answer": llm_resp.get("text", "").strip(),
+            "citations": citations,
+            "pipeline_meta": pipeline_meta,
+            "error": None
+        }
+
+    except Exception as e:
+        return {
+            "answer": "",
+            "citations": [],
+            "pipeline_meta": pipeline_meta,
+            "error": str(e)
+        }
