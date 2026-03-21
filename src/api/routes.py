@@ -12,15 +12,25 @@ from src.api.models import (
     SyncRequest, SyncResponse,
     StatusResponse, Citation
 )
-from src.orchestrator import orchestrate_query, set_chunks_path
+from src.orchestrator import orchestrate_query, set_chunks_path, orchestrate_zero_storage
 from src.ingestion.api import ingest_from_directory, sync_to_pinecone, get_index_status
 from src.retrieval.keyword_search import reload_index
 
 router = APIRouter()
 
 # Upload directory for user documents
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+if os.getenv("ENV") == "production":
+    UPLOAD_DIR = Path("/tmp/uploads")
+else:
+    UPLOAD_DIR = Path("uploads")
+
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@router.get("/health")
+async def health():
+    """Health check endpoint."""
+    return {"status": "ok", "environment": os.getenv("ENV", "development")}
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -69,22 +79,29 @@ async def query(request: QueryRequest):
 async def ingest(request: IngestRequest):
     """Ingest documents from directory and create chunks."""
     try:
+        output_path = request.output_path
+        # Use /tmp in production if default path is used
+        if os.getenv("ENV") == "production" and output_path == "data/chunks.jsonl":
+            output_path = "/tmp/chunks.jsonl"
+
         result = ingest_from_directory(
             docs_dir=request.docs_dir,
-            output_path=request.output_path,
-            provider=request.provider
+            output_path=output_path,
+            provider=request.provider,
+            use_docling=request.use_docling,
+            use_structure=request.use_structure
         )
 
         # Reload BM25 index if successful
         if result.status == "success":
-            reload_index(request.output_path)
-            set_chunks_path(request.output_path)
+            reload_index(output_path)
+            set_chunks_path(output_path)
 
         return IngestResponse(
             status=result.status,
             documents=result.documents,
             chunks=result.chunks,
-            output_path=result.output_path,
+            output_path=output_path,
             errors=result.errors
         )
     except Exception as e:
@@ -95,9 +112,17 @@ async def ingest(request: IngestRequest):
 async def sync_pinecone(request: SyncRequest):
     """Sync embeddings to Pinecone vector database."""
     try:
+        chunks_path = request.chunks_path
+        # Use /tmp in production if default path is used
+        if os.getenv("ENV") == "production" and chunks_path == "data/chunks.jsonl":
+            # Check if /tmp/chunks.jsonl exists, otherwise fall back to bundled data if it exists
+            if os.path.exists("/tmp/chunks.jsonl"):
+                chunks_path = "/tmp/chunks.jsonl"
+
         result = sync_to_pinecone(
-            chunks_path=request.chunks_path,
-            batch_size=request.batch_size
+            chunks_path=chunks_path,
+            batch_size=request.batch_size,
+            store_text=request.store_text
         )
         return SyncResponse(
             status=result.status,
@@ -249,21 +274,37 @@ async def query_secure(request: dict):
     ZERO-STORAGE QUERY with advanced retrieval pipeline.
 
     Features:
-    - Query rewriting (expand/reformulate for better retrieval)
+    - Query rewriting with multiple strategies (expand, multi, decompose, auto)
     - Reranking (cross-encoder precision boost after re-fetch)
     - Context shaping (token budget, deduplication)
     - Zero-storage: Re-fetches text from Dropbox at query time
 
+    Parameters:
+    - query: User question (required)
+    - access_token: Dropbox OAuth token (required)
+    - top_k: Number of chunks to retrieve (default: 3)
+    - use_rewriting: Enable query rewriting (default: true)
+    - rewrite_strategy: Strategy for query rewriting (default: "auto")
+        - "expand": Rule-based synonym expansion (fast, no LLM)
+        - "multi": LLM generates multiple query variants
+        - "decompose": LLM breaks complex queries into sub-queries
+        - "auto": Automatically choose based on query complexity
+        - "none": Disable rewriting
+    - use_reranking: Enable cross-encoder reranking (default: true)
+    - use_context_shaping: Enable token budget & dedup (default: true)
+    - token_budget: Max tokens for context (default: 2000)
+
     Flow:
-    1. Query rewriting (optional)
-    2. Generate query embedding(s)
-    3. Search Pinecone for similar chunks
-    4. Re-fetch files from Dropbox
-    5. Extract chunk text using stored positions
-    6. Rerank chunks (optional)
-    7. Shape context (token budget)
-    8. Send to LLM for answer generation
-    9. Return answer (text never stored)
+    1. Query rewriting (optional, strategy-based)
+    2. Generate query embedding(s) for all variants
+    3. Search Pinecone with all query variants
+    4. Deduplicate results across variants
+    5. Re-fetch files from Dropbox
+    6. Extract chunk text using stored positions
+    7. Rerank chunks with cross-encoder (optional)
+    8. Shape context (token budget, dedup, pruning)
+    9. Send to LLM for answer generation
+    10. Return answer (text never stored)
     """
     from src.ingestion.embeddings import get_embedding
     from pinecone import Pinecone
@@ -275,6 +316,7 @@ async def query_secure(request: dict):
 
     # Advanced retrieval options
     use_rewriting = request.get("use_rewriting", True)
+    rewrite_strategy = request.get("rewrite_strategy", "auto")  # expand, multi, decompose, auto, none
     use_reranking = request.get("use_reranking", True)
     use_context_shaping = request.get("use_context_shaping", True)
     token_budget = request.get("token_budget", 2000)
@@ -285,186 +327,18 @@ async def query_secure(request: dict):
     if not access_token:
         return {"error": "Dropbox access token required for zero-storage queries", "answer": ""}
 
-    # Track pipeline metadata
-    pipeline_meta = {
-        "rewriting_enabled": use_rewriting,
-        "reranking_enabled": use_reranking,
-        "context_shaping_enabled": use_context_shaping
-    }
-
-    try:
-        # 1. Query rewriting (optional)
-        queries_to_search = [query]
-        if use_rewriting:
-            try:
-                from src.query.rewriter import rewrite_query
-                rewrite_result = rewrite_query(
-                    query=query,
-                    num_variants=2,
-                    strategy="expand",  # Fast, no LLM needed
-                    use_llm=False
-                )
-                queries_to_search = rewrite_result.rewritten_queries[:3]  # Max 3 variants
-                pipeline_meta["rewrite_strategy"] = rewrite_result.strategy_used
-                pipeline_meta["query_variants"] = len(queries_to_search)
-            except Exception as e:
-                pipeline_meta["rewrite_error"] = str(e)[:50]
-                queries_to_search = [query]
-
-        # 2. Search Pinecone with all query variants
-        pc = Pinecone(api_key=cfg.PINECONE_API_KEY)
-        idx_meta = pc.describe_index(cfg.PINECONE_INDEX_NAME)
-        host = getattr(idx_meta, "host", None) or idx_meta.get("host")
-        index = pc.Index(host=host)
-
-        # Fetch more results for reranking
-        fetch_k = top_k * 3 if use_reranking else top_k
-
-        all_matches = []
-        seen_ids = set()
-
-        for q in queries_to_search:
-            query_embedding = get_embedding(q, provider="sentence-transformers", dim=384)
-            results = index.query(
-                vector=query_embedding,
-                top_k=fetch_k,
-                include_metadata=True
-            )
-            # Deduplicate across query variants
-            for match in results.matches:
-                if match.id not in seen_ids:
-                    seen_ids.add(match.id)
-                    all_matches.append(match)
-
-        if not all_matches:
-            return {"answer": "No relevant documents found.", "citations": [], "pipeline_meta": pipeline_meta}
-
-        pipeline_meta["initial_matches"] = len(all_matches)
-
-        # 3. Group chunks by file for efficient fetching
-        files_to_fetch = {}
-        for match in all_matches:
-            meta = match.metadata or {}
-            file_path = meta.get("file_path", "")
-            if file_path:
-                if file_path not in files_to_fetch:
-                    files_to_fetch[file_path] = []
-                files_to_fetch[file_path].append({
-                    "id": match.id,
-                    "score": match.score,
-                    "start_char": meta.get("start_char", 0),
-                    "end_char": meta.get("end_char", 0),
-                    "filename": meta.get("filename", ""),
-                })
-
-        # 4. Re-fetch files from Dropbox and extract chunks
-        chunks_with_text = []
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            for file_path, chunks in files_to_fetch.items():
-                # Fetch file content
-                response = await client.post(
-                    "https://content.dropboxapi.com/2/files/download",
-                    headers={
-                        "Authorization": f"Bearer {access_token}",
-                        "Dropbox-API-Arg": f'{{"path": "{file_path}"}}'
-                    }
-                )
-
-                if response.status_code == 200:
-                    # Handle PDF vs text
-                    if file_path.lower().endswith('.pdf'):
-                        import io
-                        from PyPDF2 import PdfReader
-                        pdf_file = io.BytesIO(response.content)
-                        reader = PdfReader(pdf_file)
-                        file_content = "\n\n".join(
-                            page.extract_text() or "" for page in reader.pages
-                        )
-                    else:
-                        file_content = response.text
-
-                    # Extract each chunk using stored positions
-                    for chunk in chunks:
-                        start = chunk["start_char"]
-                        end = chunk["end_char"]
-                        chunk_text = file_content[start:end] if end > start else file_content[:500]
-                        chunks_with_text.append({
-                            "id": chunk["id"],
-                            "score": chunk["score"],
-                            "text": chunk_text.strip(),
-                            "filename": chunk["filename"],
-                        })
-
-        if not chunks_with_text:
-            return {"answer": "Could not retrieve document content. Please reconnect to Dropbox.", "citations": [], "pipeline_meta": pipeline_meta}
-
-        # Sort by initial score
-        chunks_with_text.sort(key=lambda x: x["score"], reverse=True)
-
-        # 5. Reranking (optional) - now we have text, can use cross-encoder
-        if use_reranking and len(chunks_with_text) > 1:
-            try:
-                from src.retrieval.reranker import rerank_chunks
-                rerank_result = rerank_chunks(
-                    query=query,
-                    chunks=chunks_with_text,
-                    top_k=top_k * 2  # Keep more for context shaping
-                )
-                chunks_with_text = rerank_result.chunks
-                pipeline_meta["rerank_model"] = rerank_result.model_used
-                pipeline_meta["reranked"] = rerank_result.reranked
-            except Exception as e:
-                pipeline_meta["rerank_error"] = str(e)[:50]
-                # Continue with original order
-
-        # 6. Context shaping (optional) - token budget, dedup, pruning
-        if use_context_shaping:
-            try:
-                from src.context.shaper import shape_context
-                shape_result = shape_context(
-                    chunks=chunks_with_text,
-                    query=query,
-                    token_budget=token_budget,
-                    enable_pruning=True,
-                    enable_compression=False  # Keep original text for accuracy
-                )
-                chunks_with_text = shape_result.chunks[:top_k]
-                pipeline_meta["original_tokens"] = shape_result.original_tokens
-                pipeline_meta["final_tokens"] = shape_result.final_tokens
-                pipeline_meta["chunks_removed"] = shape_result.chunks_removed
-            except Exception as e:
-                pipeline_meta["shaping_error"] = str(e)[:50]
-                chunks_with_text = chunks_with_text[:top_k]
-        else:
-            chunks_with_text = chunks_with_text[:top_k]
-
-        # 7. Build prompt and call LLM
-        from src.prompts.rag_prompt import build_rag_prompt
-        from src.llm_providers import call_llm
-
-        prompt = build_rag_prompt(query=query, chunks=chunks_with_text, k=top_k)
-        llm_resp = call_llm(prompt=prompt, temperature=0.0, max_tokens=512)
-
-        # 8. Build response
-        citations = [
-            {"id": c["id"], "score": c["score"], "snippet": c["text"][:200]}
-            for c in chunks_with_text[:top_k]
-        ]
-
-        return {
-            "answer": llm_resp.get("text", "").strip(),
-            "citations": citations,
-            "pipeline_meta": pipeline_meta,
-            "error": None
-        }
-
-    except Exception as e:
-        return {
-            "answer": "",
-            "citations": [],
-            "pipeline_meta": pipeline_meta if 'pipeline_meta' in dir() else {},
-            "error": str(e)
-        }
+    # Call the unified orchestrator
+    result = await orchestrate_zero_storage(
+        query=query,
+        access_token=access_token,
+        top_k=top_k,
+        use_rewriting=use_rewriting,
+        rewrite_strategy=rewrite_strategy,
+        use_reranking=use_reranking,
+        use_context_shaping=use_context_shaping,
+        token_budget=token_budget
+    )
+    return result
 
 
 @router.post("/dropbox/token")
