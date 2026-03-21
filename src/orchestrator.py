@@ -645,7 +645,24 @@ def orchestrate_advanced(
         raise
 
 
-from langfuse.decorators import observe, langfuse_context
+# Langfuse observability (optional - graceful fallback if not available)
+try:
+    from langfuse.decorators import observe, langfuse_context
+    HAS_LANGFUSE = True
+except ImportError:
+    HAS_LANGFUSE = False
+    # Fallback: no-op decorator and context
+    def observe(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+
+    class _DummyContext:
+        def update_current_trace(self, *args, **kwargs):
+            pass
+        def update_current_observation(self, *args, **kwargs):
+            pass
+    langfuse_context = _DummyContext()
 
 async def _dummy_async():
     pass
