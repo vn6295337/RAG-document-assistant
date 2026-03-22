@@ -65,16 +65,59 @@ async def dropbox_webhook_notification(request: Request):
 
     # Auto-fetch changes using stored token
     from src.sync.change_tracker import auto_fetch_changes
-    import asyncio
     try:
         changes = await auto_fetch_changes()
         logger.info(f"Auto-fetched {len(changes)} changes from webhook")
+
+        # Send email notification if changes found
+        if changes:
+            await _send_change_notification(changes)
     except Exception as e:
         logger.error(f"Auto-fetch in webhook failed: {e}")
         changes = []
 
     # Always return 200 OK to acknowledge receipt
     return {"status": "ok", "accounts_notified": len(result.accounts), "changes_fetched": len(changes)}
+
+
+async def _send_change_notification(changes):
+    """Send SNS email notification for file changes."""
+    import boto3
+    import os
+
+    sns_topic = os.getenv("SNS_TOPIC_ARN", "arn:aws:sns:us-east-1:691210491730:rag-dropbox-changes")
+
+    try:
+        sns = boto3.client('sns', region_name=os.getenv('AWS_REGION', 'us-east-1'))
+
+        # Build message
+        change_list = "\n".join([
+            f"  - [{c.change_type.value.upper()}] {c.path}"
+            for c in changes[:10]  # Limit to 10 in email
+        ])
+
+        if len(changes) > 10:
+            change_list += f"\n  ... and {len(changes) - 10} more"
+
+        message = f"""Dropbox File Changes Detected
+
+{len(changes)} file(s) changed:
+{change_list}
+
+These files may need re-indexing for your RAG system.
+
+--
+RAG Document Assistant
+"""
+
+        sns.publish(
+            TopicArn=sns_topic,
+            Subject=f"Dropbox: {len(changes)} file(s) changed",
+            Message=message
+        )
+        logger.info(f"Sent SNS notification for {len(changes)} changes")
+    except Exception as e:
+        logger.error(f"Failed to send SNS notification: {e}")
 
 
 @router.get("/sync/status")
