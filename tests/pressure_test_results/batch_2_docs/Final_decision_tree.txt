@@ -1,0 +1,133 @@
+INPUT / CONTEXT
+     │
+     ▼
+[Q1] Are tasks structured, predictable, single-step, or rule-based?
+     ├─ YES → NON-AGENT (code, rules engine, RPA, classic ML, simple RAG). END
+     └─ NO
+         │
+         ▼
+[Q2] Is the goal limited to content generation, summarization, or Q&A over static data?
+     ├─ YES → NON-AGENT (single LLM call or standard RAG). END
+     └─ NO
+         │
+         ▼
+[Q3] Are governance constraints (guardrails, human oversight, cost/latency,
+     audit logging) satisfied for autonomous execution?
+     ├─ YES → Proceed to AGENT decision path
+     └─ NO  → WORKFLOW or NON-AGENT; add governance before agentizing. END
+         │
+         ▼
+[Q4] Can one agent reasonably own the full task (manageable tools, clear boundaries)?
+     ├─ YES → SINGLE AGENT -------------------------------┐
+     │                                                    │
+     └─ NO  → MULTI-AGENT --------------------------------┘
+                │
+                ▼
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │                        SINGLE AGENT PATH                                │
+   └─────────────────────────────────────────────────────────────────────────┘
+     │
+     ▼
+[Q5] Deployment strategy: Is there an existing SaaS agent that meets reqs?
+     ├─ YES → BUY (SaaS agent). IMPLEMENT + INTEGRATE WITH APIs. GO TO RUN LOOP
+     └─ NO
+         │
+         ▼
+[Q6] Must agent integrate closely with internal APIs/events or pre-existing systems?
+     ├─ YES → INTEGRATE (Agent + orchestrator around existing systems). GO TO RUN LOOP
+     └─ NO
+         │
+         ▼
+[Q7] Is capability core to competitive advantage or needs deep customization?
+     ├─ YES → BUILD (custom agent). GO TO RUN LOOP
+     └─ NO  → BUY or INTEGRATE (reassess). GO TO RUN LOOP
+
+     ┌─────────────────────────────────────────────────────────────────────────┐
+     │                              RUN LOOP                                   │
+     └─────────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+[Q8] Problem decomposition / planner: Does the task need
+     - external retrieval?    → add RAG
+     - tool/action invocation?→ add TOOL-BASED
+     - long-term state?       → add MEMORY
+     - multi-step conditional planning? → add PLANNER/ORCHESTRATOR
+     - parallel subtasks?     → enable PARALLELIZATION
+         │
+         ▼
+[ACTION] Build plan: select model(s), tool registry, memory store, orchestration pattern,
+         success metrics and human-in-the-loop gates.
+         │
+         ▼
+[STEP] Execute Plan:
+   1) Preprocess input, assemble prompt/context (including retrieved docs & tool schemas)
+   2) Call model(s) / invoke tools as planned
+   3) Collect outputs and tool responses
+         │
+         ▼
+[EVAL] Does output meet success criteria / validation checks / safety gates?
+     ├─ YES →
+     │     ├─ If action required: Execute action via tool(s) → RETURN result
+     │     ├─ Log, audit, persist state to MEMORY as configured
+     │     └─ Emit monitoring metrics; END
+     └─ NO →
+         │
+         ▼
+[Q9] Can the agent reflect/auto-correct (evaluator + reflection)?
+     ├─ YES → REFLECT & REFINE: run evaluator (scoring/consistency), update plan or prompt,
+     │         optionally select alternate model or tool, then RETRY → back to Execute Plan
+     └─ NO  →
+         │
+         ▼
+[Q10] Should this escalate to human review or safe-fail?
+     ├─ YES → Escalate to HUMAN-IN-THE-LOOP / manual approval; log and END (or loop post-review)
+     └─ NO  → Safe-fail: return partial result + explain limitations; log and END
+
+     ┌─────────────────────────────────────────────────────────────────────────┐
+     │                           MULTI-AGENT PATH                              │
+     └─────────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+[Q11] Choose multi-agent pattern:
+      - SEQUENTIAL (predefined chain)    → use workflow orchestrator
+      - PARALLEL (scatter-gather)        → run specialists concurrently + AGGREGATOR
+      - ROUTER/SUPERVISOR (classify & dispatch) → use router + specialists + supervisor
+      - HIERARCHICAL (manager / specialists)    → supervisor oversees subagents
+         │
+         ▼
+[STEP] Orchestrator: dispatch to specialist agents with scoped contexts & tools;
+        collect outputs → AGGREGATOR/EVALUATOR synthesizes result
+         │
+         ▼
+[EVAL-MA] Aggregated result passes validation?
+     ├─ YES → Commit actions (as above), update shared MEMORY, log, END
+     └─ NO →
+         │
+         ▼
+[Q12] Can reassign / re-run subagents or adjust orchestration rules?
+     ├─ YES → adjust dispatch / retry specific subagents → back to Orchestrator
+     └─ NO  → Escalate to supervisor/human; safe-fail; log and END
+
+     ┌─────────────────────────────────────────────────────────────────────────┐
+     │                       OBSERVABILITY & SAFETY LAYER                      │
+     └─────────────────────────────────────────────────────────────────────────┘
+         │
+         ├─ Monitoring agent collects metrics, errors, drift, cost
+         ├─ Evaluator runs periodic EVALS and audits (page-level scoring, red-team)
+         ├─ Memory manager enforces retention, compression, access controls
+         └─ Governance enforces guardrails, kill-switch, RBAC, explainability logs
+         │
+         └─ On anomaly or policy breach → Trigger kill-switch / rollback / human alert → END
+
+FEEDBACK LOOPS (explicit):
+     • Execute Plan → EVAL → REFLECT/REFINE → Execute Plan (retry loop)
+     • Multi-Agent: Orchestrator → EVAL-MA → Reassign/Retry subagents (loop)
+     • Post-success: Commit → Update MEMORY → Use MEMORY in future planning (learning loop)
+     • Monitoring → Periodic EVALS → Model/tool swap or prompt update → redeploy (ops loop)
+
+TERMINATION OUTCOMES (explicit):
+     - SUCCESS: Result returned, actions committed, memory updated, metrics logged. END
+     - SAFE-FAIL: Partial result + explanation, logs, escalate if needed. END
+     - ESCALATE: Human review required; suspend autonomous actions. END
+     - ABORT: Governance/kill-switch triggered; roll back and alert. END
+```

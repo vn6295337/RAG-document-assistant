@@ -1,0 +1,416 @@
+{
+  "test_run_id": "20260214_162135",
+  "server_url": "http://localhost:8001",
+  "start_time": "2026-02-14T16:21:35.572489",
+  "end_time": "2026-02-14T16:25:13.266835",
+  "indexing_results": [
+    {
+      "batch_id": 1,
+      "batch_size": 5,
+      "documents": [
+        {
+          "filename": "AWS_AI_Agents.pdf",
+          "file_type": "pdf",
+          "size_kb": 5615.29,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/AWS_AI_Agents.pdf"
+        },
+        {
+          "filename": "Agentic_AI_Stack.md",
+          "file_type": "md",
+          "size_kb": 13.58,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Agentic_AI_Stack.md"
+        },
+        {
+          "filename": "Algorithms in AI, Stanford.pdf",
+          "file_type": "pdf",
+          "size_kb": 525.57,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Algorithms in AI, Stanford.pdf"
+        },
+        {
+          "filename": "Anthropic_AI_Agents.pdf",
+          "file_type": "pdf",
+          "size_kb": 1642.12,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Anthropic_AI_Agents.pdf"
+        },
+        {
+          "filename": "Consolidated.md",
+          "file_type": "md",
+          "size_kb": 15.21,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Consolidated.md"
+        }
+      ],
+      "ingest_time_sec": 103.97,
+      "sync_time_sec": 0.49,
+      "total_time_sec": 104.46,
+      "chunks_created": 0,
+      "vectors_upserted": 0,
+      "errors": [
+        "No chunks generated from documents",
+        "Chunks file not found: data/chunks.jsonl"
+      ],
+      "timestamp": "2026-02-14T16:23:29.198702"
+    },
+    {
+      "batch_id": 2,
+      "batch_size": 10,
+      "documents": [
+        {
+          "filename": "AWS_AI_Agents.pdf",
+          "file_type": "pdf",
+          "size_kb": 5615.29,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/AWS_AI_Agents.pdf"
+        },
+        {
+          "filename": "Agentic_AI_Stack.md",
+          "file_type": "md",
+          "size_kb": 13.58,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Agentic_AI_Stack.md"
+        },
+        {
+          "filename": "Algorithms in AI, Stanford.pdf",
+          "file_type": "pdf",
+          "size_kb": 525.57,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Algorithms in AI, Stanford.pdf"
+        },
+        {
+          "filename": "Anthropic_AI_Agents.pdf",
+          "file_type": "pdf",
+          "size_kb": 1642.12,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Anthropic_AI_Agents.pdf"
+        },
+        {
+          "filename": "Consolidated.md",
+          "file_type": "md",
+          "size_kb": 15.21,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Consolidated.md"
+        },
+        {
+          "filename": "Decision-Tree.md",
+          "file_type": "md",
+          "size_kb": 51.48,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Decision-Tree.md"
+        },
+        {
+          "filename": "Final_decision_tree.txt",
+          "file_type": "txt",
+          "size_kb": 7.53,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Final_decision_tree.txt"
+        },
+        {
+          "filename": "Google_AI_Agents.pdf",
+          "file_type": "pdf",
+          "size_kb": 1280.68,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Google_AI_Agents.pdf"
+        },
+        {
+          "filename": "Microsoft_AI_Agents.pdf",
+          "file_type": "pdf",
+          "size_kb": 6627.21,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Microsoft_AI_Agents.pdf"
+        },
+        {
+          "filename": "NVIDIAAn.pdf",
+          "file_type": "pdf",
+          "size_kb": 88.43,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/NVIDIAAn.pdf"
+        }
+      ],
+      "ingest_time_sec": 0.76,
+      "sync_time_sec": 0.05,
+      "total_time_sec": 0.82,
+      "chunks_created": 0,
+      "vectors_upserted": 0,
+      "errors": [
+        "No chunks generated from documents",
+        "Chunks file not found: data/chunks.jsonl"
+      ],
+      "timestamp": "2026-02-14T16:23:37.381546"
+    },
+    {
+      "batch_id": 3,
+      "batch_size": 16,
+      "documents": [
+        {
+          "filename": "AWS_AI_Agents.pdf",
+          "file_type": "pdf",
+          "size_kb": 5615.29,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/AWS_AI_Agents.pdf"
+        },
+        {
+          "filename": "Agentic_AI_Stack.md",
+          "file_type": "md",
+          "size_kb": 13.58,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Agentic_AI_Stack.md"
+        },
+        {
+          "filename": "Algorithms in AI, Stanford.pdf",
+          "file_type": "pdf",
+          "size_kb": 525.57,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Algorithms in AI, Stanford.pdf"
+        },
+        {
+          "filename": "Anthropic_AI_Agents.pdf",
+          "file_type": "pdf",
+          "size_kb": 1642.12,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Anthropic_AI_Agents.pdf"
+        },
+        {
+          "filename": "Consolidated.md",
+          "file_type": "md",
+          "size_kb": 15.21,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Consolidated.md"
+        },
+        {
+          "filename": "Decision-Tree.md",
+          "file_type": "md",
+          "size_kb": 51.48,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Decision-Tree.md"
+        },
+        {
+          "filename": "Final_decision_tree.txt",
+          "file_type": "txt",
+          "size_kb": 7.53,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Final_decision_tree.txt"
+        },
+        {
+          "filename": "Google_AI_Agents.pdf",
+          "file_type": "pdf",
+          "size_kb": 1280.68,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Google_AI_Agents.pdf"
+        },
+        {
+          "filename": "Microsoft_AI_Agents.pdf",
+          "file_type": "pdf",
+          "size_kb": 6627.21,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/Microsoft_AI_Agents.pdf"
+        },
+        {
+          "filename": "NVIDIAAn.pdf",
+          "file_type": "pdf",
+          "size_kb": 88.43,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/NVIDIAAn.pdf"
+        },
+        {
+          "filename": "OpenAI_AI_Agents.pdf",
+          "file_type": "pdf",
+          "size_kb": 1331.63,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/OpenAI_AI_Agents.pdf"
+        },
+        {
+          "filename": "a_ai_ml_learning.md",
+          "file_type": "md",
+          "size_kb": 67.44,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/a_ai_ml_learning.md"
+        },
+        {
+          "filename": "agents-robots-and-us-skill-partnerships-in-the-age-of-ai.pdf",
+          "file_type": "pdf",
+          "size_kb": 8040.22,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/agents-robots-and-us-skill-partnerships-in-the-age-of-ai.pdf"
+        },
+        {
+          "filename": "ai-radar-2026-web-jan-2026-edit.pdf",
+          "file_type": "pdf",
+          "size_kb": 521.29,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/ai-radar-2026-web-jan-2026-edit.pdf"
+        },
+        {
+          "filename": "verification_activated.txt",
+          "file_type": "txt",
+          "size_kb": 3.62,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/verification_activated.txt"
+        },
+        {
+          "filename": "verification_system_complete.txt",
+          "file_type": "txt",
+          "size_kb": 7.28,
+          "path": "/home/vn6295337/ragDocumentAssistant/tests/ragPressureTestDocs/verification_system_complete.txt"
+        }
+      ],
+      "ingest_time_sec": 0.82,
+      "sync_time_sec": 0.08,
+      "total_time_sec": 0.9,
+      "chunks_created": 0,
+      "vectors_upserted": 0,
+      "errors": [
+        "No chunks generated from documents",
+        "Chunks file not found: data/chunks.jsonl"
+      ],
+      "timestamp": "2026-02-14T16:23:45.291567"
+    }
+  ],
+  "query_results": [
+    {
+      "query_id": 1,
+      "query_type": "Factual lookup",
+      "query_text": "What are the two key variations of the parallelization workflow pattern according to Anthropic?",
+      "latency_ms": 5657.8,
+      "answer": "",
+      "citations": [],
+      "source_snippets": [],
+      "error": "retrieval_failed",
+      "timestamp": "2026-02-14T16:23:57.692369"
+    },
+    {
+      "query_id": 2,
+      "query_type": "Cross-document",
+      "query_text": "How do Anthropic, OpenAI, and Google each define the distinction between workflows and agents?",
+      "latency_ms": 7748.6,
+      "answer": "",
+      "citations": [],
+      "source_snippets": [],
+      "error": "retrieval_failed",
+      "timestamp": "2026-02-14T16:24:05.441774"
+    },
+    {
+      "query_id": 3,
+      "query_type": "Synthesis",
+      "query_text": "What workforce archetypes are predicted to emerge in the agent-orchestrated enterprise, and how do their roles differ?",
+      "latency_ms": 5012.8,
+      "answer": "",
+      "citations": [],
+      "source_snippets": [],
+      "error": "retrieval_failed",
+      "timestamp": "2026-02-14T16:24:10.456248"
+    },
+    {
+      "query_id": 4,
+      "query_type": "Specific detail",
+      "query_text": "In the Agentic AI Stack, what is the embedding dimensionality for sentence-transformers versus Nomic Embed?",
+      "latency_ms": 4214.0,
+      "answer": "",
+      "citations": [],
+      "source_snippets": [],
+      "error": "retrieval_failed",
+      "timestamp": "2026-02-14T16:24:14.673376"
+    },
+    {
+      "query_id": 5,
+      "query_type": "Process/how-to",
+      "query_text": "What are the five stages in the Claude decision framework for determining whether to build an agentic system?",
+      "latency_ms": 7575.8,
+      "answer": "",
+      "citations": [],
+      "source_snippets": [],
+      "error": "retrieval_failed",
+      "timestamp": "2026-02-14T16:24:22.249838"
+    },
+    {
+      "query_id": 6,
+      "query_type": "No-answer (adversarial)",
+      "query_text": "What is the maximum token limit for GPT-4 when used in agentic workflows?",
+      "latency_ms": 3205.1,
+      "answer": "",
+      "citations": [],
+      "source_snippets": [],
+      "error": "retrieval_failed",
+      "timestamp": "2026-02-14T16:24:25.455664"
+    },
+    {
+      "query_id": 7,
+      "query_type": "Comparison",
+      "query_text": "How does the sequential multi-agent pattern differ from the parallel multi-agent pattern in terms of orchestration?",
+      "latency_ms": 5224.3,
+      "answer": "",
+      "citations": [],
+      "source_snippets": [],
+      "error": "retrieval_failed",
+      "timestamp": "2026-02-14T16:24:30.681979"
+    },
+    {
+      "query_id": 8,
+      "query_type": "Inference",
+      "query_text": "Based on the AI Radar 2026 predictions, what challenges might organizations face when scaling AI agent deployments?",
+      "latency_ms": 4036.5,
+      "answer": "",
+      "citations": [],
+      "source_snippets": [],
+      "error": "retrieval_failed",
+      "timestamp": "2026-02-14T16:24:34.723768"
+    },
+    {
+      "query_id": 9,
+      "query_type": "Edge case",
+      "query_text": "What happens when a multi-agent loop pattern fails to meet its exit condition?",
+      "latency_ms": 6047.5,
+      "answer": "",
+      "citations": [],
+      "source_snippets": [],
+      "error": "retrieval_failed",
+      "timestamp": "2026-02-14T16:24:40.771812"
+    },
+    {
+      "query_id": 10,
+      "query_type": "Vague/broad",
+      "query_text": "Explain transformers",
+      "latency_ms": 4685.6,
+      "answer": "",
+      "citations": [],
+      "source_snippets": [],
+      "error": "retrieval_failed",
+      "timestamp": "2026-02-14T16:24:45.458907"
+    }
+  ],
+  "edge_case_results": [
+    {
+      "test_id": 1,
+      "test_type": "Out-of-scope",
+      "query_text": "What is the best pizza topping for a Friday night dinner party?",
+      "latency_ms": 4868.6,
+      "answer": "",
+      "pass_fail": "Review",
+      "notes": "Manual review needed",
+      "timestamp": "2026-02-14T16:24:50.339050"
+    },
+    {
+      "test_id": 2,
+      "test_type": "Multi-doc synthesis",
+      "query_text": "Compare the guardrail and safety mechanisms recommended by AWS, Microsoft, and NVIDIA for production AI agent deployments.",
+      "latency_ms": 3644.0,
+      "answer": "",
+      "pass_fail": "Review",
+      "notes": "Only 0 citation(s)",
+      "timestamp": "2026-02-14T16:24:53.984193"
+    },
+    {
+      "test_id": 3,
+      "test_type": "Ambiguous",
+      "query_text": "How do agents work?",
+      "latency_ms": 4914.3,
+      "answer": "",
+      "pass_fail": "Fail",
+      "notes": "retrieval_failed",
+      "timestamp": "2026-02-14T16:24:58.924080"
+    },
+    {
+      "test_id": 4,
+      "test_type": "Very long query",
+      "query_text": "I am currently working on implementing an enterprise-grade AI agent system for my organization and I need to understand the complete architectural considerations including but not limited to the vario",
+      "latency_ms": 3198.5,
+      "answer": "",
+      "pass_fail": "Fail",
+      "notes": "Failed to process",
+      "timestamp": "2026-02-14T16:25:02.132413"
+    },
+    {
+      "test_id": 5,
+      "test_type": "Single-word",
+      "query_text": "Guardrails",
+      "latency_ms": 3535.4,
+      "answer": "",
+      "pass_fail": "Fail",
+      "notes": "retrieval_failed",
+      "timestamp": "2026-02-14T16:25:05.669745"
+    },
+    {
+      "test_id": 6,
+      "test_type": "Post-disconnect",
+      "query_text": "What are the key agentic design patterns?",
+      "latency_ms": 3787.4,
+      "answer": "",
+      "pass_fail": "Pass",
+      "notes": "Handled missing index gracefully",
+      "timestamp": "2026-02-14T16:25:13.216215"
+    }
+  ]
+}

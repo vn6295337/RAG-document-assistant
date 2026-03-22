@@ -59,12 +59,22 @@ async def dropbox_webhook_notification(request: Request):
         logger.error(f"Invalid webhook notification: {result.error}")
         raise HTTPException(status_code=400, detail=result.error)
 
-    # Log the accounts with changes (actual sync is triggered separately)
+    # Log the accounts with changes
     if result.accounts:
         logger.info(f"Dropbox change notification for accounts: {result.accounts}")
 
+    # Auto-fetch changes using stored token
+    from src.sync.change_tracker import auto_fetch_changes
+    import asyncio
+    try:
+        changes = await auto_fetch_changes()
+        logger.info(f"Auto-fetched {len(changes)} changes from webhook")
+    except Exception as e:
+        logger.error(f"Auto-fetch in webhook failed: {e}")
+        changes = []
+
     # Always return 200 OK to acknowledge receipt
-    return {"status": "ok", "accounts_notified": len(result.accounts)}
+    return {"status": "ok", "accounts_notified": len(result.accounts), "changes_fetched": len(changes)}
 
 
 @router.get("/sync/status")

@@ -1,0 +1,267 @@
+# Agentic AI Tech Stack - Component Catalog
+
+### **Layer 1 – Infrastructure**
+- **1.1 Compute:** *Accelerate model inference, training, embedding generation*
+  - 1.1.1 Schedulers: K8s ✅, Slurm ✅, Ray ✅, Nomad ✅
+  - 1.1.2 CPU nodes: Google Colab 🎁(T4 GPU free, 12h sessions), Kaggle Notebooks 🎁(T4, 30h/week), AWS Graviton 💰, GCP e2 💰
+  - 1.1.3 GPU/TPU clusters: NVIDIA A100/H100 💰, Google TPU 💰
+- **1.2 Network:** *Enable low-latency communication, traffic routing, load balancing*
+  - 1.2.1 SDN: Open vSwitch ✅
+  - 1.2.2 Service mesh: Istio ✅, Linkerd ✅, Cilium ✅
+  - 1.2.3 Ingress: Traefik ✅, NGINX ✅, Envoy ✅
+  - 1.2.4 Spine-leaf topology 💰, RDMA/InfiniBand 💰
+- **1.3 Storage:** *Store models, training data, vectors, logs, backups*
+  - 1.3.1 Local: NVMe/SSD ✅
+  - 1.3.2 Distributed FS: Ceph ✅, GlusterFS ✅, JuiceFS ✅
+  - 1.3.3 Object storage: MinIO ✅ (AGPL), SeaweedFS ✅ (Apache 2.0), Cloudflare R2 🎁(10GB free), Backblaze B2 🎁(10GB free), S3 💰, GCS 💰
+  - 1.3.4 Data versioning: DVC ✅, LakeFS ✅, MLflow ✅
+- **1.4 Orchestration:** *Automate deployment, infrastructure setup, CI/CD pipelines*
+  - 1.4.1 Containers: Docker ✅, Podman ✅
+  - 1.4.2 IaC: Terraform ✅, Pulumi ✅, Ansible ✅
+  - 1.4.3 Workflow engines: Prefect ✅, Airflow ✅, Temporal ✅, Dagster ✅
+  - 1.4.4 CI/CD: GitHub Actions 🎁(2k min/mo), GitLab CI 🎁(400 min/mo)
+- **1.5 Observability:** *Monitor performance, debug issues, track metrics/traces*
+  - 1.5.1 Logs: Loki ✅, Fluentd ✅
+  - 1.5.2 Metrics: Prometheus ✅, StatsD ✅
+  - 1.5.3 Traces: Jaeger ✅, Tempo ✅
+  - 1.5.4 Unified: OpenTelemetry ✅
+  - 1.5.5 Dashboards: Grafana ✅, cAdvisor ✅
+- **1.6 Governance:** *Secure secrets, enforce access control, protect PII*
+  - 1.6.1 Secrets: Vault ✅, SOPS ✅
+  - 1.6.2 RBAC: Keycloak ✅, OPA ✅
+  - 1.6.3 Network policies: Calico ✅, Cilium ✅
+  - 1.6.4 PII redaction: Presidio ✅
+
+### **Layer 2 – Data Plane**
+- **2.1 Object Storage:** *Store raw files, model artifacts, logs, backups*
+  - MinIO ✅ (AGPL), SeaweedFS ✅ (Apache 2.0)
+  - Cloudflare R2 🎁(10GB free), Backblaze B2 🎁(10GB free), Supabase Storage 🎁(1GB free)
+  - S3 💰, GCS 💰, Azure Blob 💰
+- **2.2 Data Lakehouse / Warehouse:** *Structured analytics, query large datasets, OLAP workloads*
+  - Apache Iceberg ✅, Apache Hudi ✅, DuckDB ✅
+  - BigQuery 🎁(1TB queries/month), Snowflake 🎁(trial credits)
+  - Databricks 💰, Delta Lake on Databricks 💰
+- **2.3 Data Connectors / ETL:** *Extract data from SaaS/DBs, transform, load into data lake*
+  - Airbyte ✅, Singer ✅, dlt ✅
+  - Airbyte Cloud 🎁(limited connectors)
+  - Fivetran 💰, Stitch 💰
+- **2.4 Data Catalog / Metadata:** *Discover datasets, track schemas, manage metadata*
+  - Apache Atlas ✅, DataHub ✅, Amundsen ✅
+  - AWS Glue Data Catalog 🎁(1M objects free)
+  - Alation 💰, Collibra 💰
+- **2.5 Data Lineage:** *Track data flow, upstream/downstream dependencies, impact analysis*
+  - OpenLineage ✅, Marquez ✅
+  - Monte Carlo 💰, Datafold 💰
+- **2.6 Schema Registry:** *Manage data schemas, versioning, compatibility checks*
+  - Confluent Schema Registry ✅, Apache Pulsar Schema ✅
+  - Confluent Cloud Schema Registry 💰
+
+### **Layer 3 – Foundation Models**
+- **3.1 LLM (Large Language Models):** *Text generation, reasoning, instruction following*
+  - Llama ✅ (Meta), Mistral ✅, Qwen ✅, Phi ✅ (Microsoft)
+  - Groq 🎁(14.4k tokens/min, Llama 3.1 70B), Gemini Flash 🎁(15 RPM, 1M context), HuggingFace Inference API 🎁(1k requests/day)
+  - GPT-4o 💰, Claude 💰, Gemini Pro 💰
+- **3.2 VLM (Vision-Language Models):** *Image understanding, OCR, visual reasoning*
+  - LLaVA ✅, Qwen-VL ✅
+  - Gemini Flash 🎁(multimodal)
+  - GPT-4o 💰, Claude 3.5 Sonnet 💰
+- **3.3 ASR (Speech-to-Text):** *Audio transcription, speech recognition*
+  - Whisper ✅ (OpenAI), Faster-Whisper ✅
+  - Google Speech-to-Text 🎁(60 min/month)
+  - AssemblyAI 💰, Deepgram 💰
+- **3.4 TTS (Text-to-Speech):** *Voice synthesis, audio generation*
+  - Coqui TTS ✅, Piper ✅
+  - Google Text-to-Speech 🎁(1M characters/month)
+  - ElevenLabs 💰, PlayHT 💰
+- **3.5 Model Serving Infrastructure:** *Deploy and serve models at scale*
+  - Ollama ✅, vLLM ✅, llama.cpp ✅, TGI (Text Generation Inference) ✅
+  - HuggingFace Inference Endpoints 🎁(limited)
+  - Together.ai 💰, Replicate 💰
+
+### **Layer 4 – Tools & Actuators**
+- **4.1 Web Search:** *Search the internet, fetch real-time information*
+  - SearXNG ✅ (meta-search engine)
+  - Tavily 🎁(1k searches/month), Serper 🎁(2.5k searches free)
+  - Google Custom Search 💰, Bing Search 💰
+- **4.2 Code Execution:** *Run Python/JS/SQL code in sandboxed environments*
+  - E2B ✅ (open-source code interpreter), Docker ✅
+  - Replit 🎁(limited), Jupyter kernels ✅
+  - Modal 💰, RunPod 💰
+- **4.3 SQL/BI Tools:** *Query databases, generate analytics*
+  - DuckDB ✅, SQLite ✅, PostgreSQL ✅
+  - BigQuery 🎁(1TB queries/month)
+  - Snowflake 💰, Databricks 💰
+- **4.4 Email/Communication:** *Send emails, messages, notifications*
+  - SMTP ✅, Postfix ✅
+  - SendGrid 🎁(100 emails/day), Mailgun 🎁(5k emails/month)
+  - AWS SES 💰, Twilio 💰
+- **4.5 CRM/ITSM Connectors:** *Integrate with enterprise systems*
+  - n8n ✅ (400+ connectors)
+  - Zapier 🎁(100 tasks/month), Make 🎁(1k ops/month)
+  - Salesforce connector 💰, ServiceNow connector 💰
+- **4.6 RPA (Robotic Process Automation):** *Automate UI interactions, browser tasks*
+  - Playwright ✅, Selenium ✅
+  - UiPath Community Edition 🎁(limited)
+  - UiPath Enterprise 💰, Power Automate 💰
+
+### **Layer 5 – Retrieval & Indexing (RAG)**
+- **5.1 Embeddings:** *Convert text to dense vectors for semantic search*
+  - sentence-transformers ✅ (all-MiniLM-L6-v2, 384-dim), Nomic Embed ✅ (768-dim), BGE ✅
+  - HuggingFace Inference API 🎁(1k requests/day), Cohere Embed 🎁(trial)
+  - Voyage AI 💰, OpenAI Ada-002 💰
+- **5.2 Vector Databases:** *Store and search embeddings efficiently*
+  - Chroma ✅ (embedded), Qdrant ✅ (self-hosted), Milvus ✅, Weaviate ✅
+  - Qdrant Cloud 🎁(1GB free), Pinecone 🎁(starter 100k vectors)
+  - Pinecone 💰, Zilliz Cloud 💰
+- **5.3 Rerankers:** *Re-score search results for better relevance*
+  - bge-reranker ✅ (cross-encoder), sentence-transformers ✅
+  - Cohere Rerank 🎁(trial)
+  - Cohere Rerank v3 💰, Jina Reranker 💰
+- **5.4 Document Parsing:** *Extract text from PDFs, DOCX, HTML*
+  - Unstructured.io ✅, PyPDF2 ✅, pdfplumber ✅, BeautifulSoup ✅
+  - Docling API 🎁(limited), LlamaParse 🎁(trial)
+  - Adobe PDF Extract 💰, AWS Textract 💰
+- **5.5 Web Crawlers:** *Scrape and index web content*
+  - Scrapy ✅, BeautifulSoup ✅, Playwright ✅
+  - Firecrawl 🎁(500 pages/month)
+  - Apify 💰, ScrapingBee 💰
+
+### **Layer 6 – Memory**
+- **6.1 Key-Value Store:** *Session state, conversation history, short-term memory*
+  - Redis ✅, Valkey ✅, DragonflyDB ✅
+  - Upstash Redis 🎁(10k commands/day), Redis Cloud 🎁(30MB)
+  - AWS ElastiCache 💰, Azure Cache 💰
+- **6.2 Vector Memory:** *Semantic recall, episodic memory search*
+  - Chroma ✅, Qdrant ✅
+  - Qdrant Cloud 🎁(1GB), Pinecone 🎁(100k vectors)
+  - Pinecone 💰, Weaviate Cloud 💰
+- **6.3 Graph Database:** *Relationship tracking, knowledge graphs, entity memory*
+  - Neo4j ✅ (Community), ArangoDB ✅, Memgraph ✅
+  - Neo4j Aura 🎁(200k nodes free)
+  - Neo4j Enterprise 💰, TigerGraph 💰
+- **6.4 Relational Database:** *Structured profile data, user preferences*
+  - PostgreSQL ✅, MySQL ✅, SQLite ✅
+  - Supabase 🎁(500MB), Neon 🎁(0.5GB)
+  - AWS RDS 💰, Google Cloud SQL 💰
+- **6.5 Memory Libraries:** *Pre-built memory abstractions and decay policies*
+  - Mem0 ✅, Letta ✅ (fka MemGPT), zep ✅
+  - Letta Cloud 🎁(limited)
+  - Zep Cloud 💰
+
+### **Layer 7 – Reasoning & Control**
+- **7.1 Reasoning Frameworks:** *Implement agent patterns like ReAct, Chain-of-Thought, Tree-of-Thoughts*
+  - LangGraph ✅, LangChain ✅, LlamaIndex ✅, DSPy ✅
+  - Prompt caching frameworks ✅
+  - LangSmith 💰 (observability add-on)
+- **7.2 Planning Algorithms:** *Decompose tasks, create execution plans*
+  - Custom planners ✅ (Python), ReAct implementation ✅
+  - AutoGPT ✅, BabyAGI ✅
+  - Commercial planning services 💰
+- **7.3 Constraint Solvers:** *Optimize under numeric/temporal constraints*
+  - OR-Tools ✅ (Google), Z3 ✅ (Microsoft), CPLEX ✅ (Community)
+  - Optimization libraries ✅ (SciPy, PuLP)
+  - Gurobi 💰, IBM CPLEX Enterprise 💰
+- **7.4 Validators:** *Validate outputs against schemas, rules, policies*
+  - Pydantic ✅, JSON Schema ✅, Cerberus ✅
+  - Guardrails AI ✅
+  - Custom validation 💰
+- **7.5 Self-Reflection Tools:** *Critique and improve agent outputs*
+  - Reflexion ✅ (paper implementation), Self-Ask ✅
+  - LLM-as-critic patterns ✅
+  - Commercial critique services 💰
+
+### **Layer 8 – Orchestration Runtime**
+- **8.1 Agent Orchestration:** *State management, DAG execution, multi-agent coordination*
+  - LangGraph ✅, LangChain ✅, LlamaIndex Workflows ✅, CrewAI ✅
+  - AutoGen ✅ (Microsoft), Semantic Kernel ✅ (Microsoft)
+  - Commercial agent platforms 💰
+- **8.2 Workflow Engines:** *Durable execution, long-running processes, scheduling*
+  - Temporal ✅, Prefect ✅, Apache Airflow ✅, Dagster ✅
+  - Kestra ✅
+  - Temporal Cloud 🎁(trial), Prefect Cloud 🎁(3k task runs/month)
+- **8.3 Task Queues:** *Async job processing, distributed workers*
+  - Celery ✅, RQ ✅, Arq ✅, Bull ✅ (Node.js)
+  - Redis queues ✅
+  - AWS SQS 💰, Google Cloud Tasks 💰
+- **8.4 HITL (Human-in-the-Loop):** *Approval workflows, human feedback collection*
+  - Custom FastAPI endpoints ✅, Streamlit forms ✅
+  - Temporal HITL patterns ✅
+  - Scale AI 💰, Label Studio Enterprise 💰
+- **8.5 Circuit Breakers & Rate Limiting:** *Prevent cascade failures, enforce quotas*
+  - Resilience patterns ✅ (Python), Polly ✅ (.NET)
+  - Kong ✅, Envoy ✅
+  - AWS API Gateway 💰, Kong Enterprise 💰
+
+### **Layer 9 – Evaluation & Observability**
+- **9.1 LLM Evaluation:** *Measure RAG quality, groundedness, hallucination*
+  - Ragas ✅, DeepEval ✅, TruLens ✅, PromptFoo ✅
+  - Arize Phoenix OSS ✅
+  - Arize Phoenix Cloud 🎁(limited), LangSmith 💰, Humanloop 💰
+- **9.2 Distributed Tracing:** *Track requests across services, debug latency*
+  - OpenTelemetry ✅, Jaeger ✅, Zipkin ✅
+  - Grafana Tempo ✅
+  - Datadog APM 💰, New Relic 💰
+- **9.3 Metrics & Dashboards:** *Collect time-series data, visualize KPIs*
+  - Prometheus ✅, Grafana ✅, VictoriaMetrics ✅
+  - StatsD ✅, Telegraf ✅
+  - Datadog 💰, New Relic 💰
+- **9.4 Logging:** *Aggregate logs, search, alert*
+  - Loki ✅ (Grafana), Fluentd ✅, Vector ✅
+  - OpenSearch ✅, Elasticsearch ✅ (Basic)
+  - Datadog Logs 💰, Splunk 💰
+- **9.5 Bias & Fairness:** *Detect demographic disparities, fairness metrics*
+  - Fairlearn ✅ (Microsoft), AI Fairness 360 ✅ (IBM), Aequitas ✅
+  - Custom fairness checks ✅
+  - Commercial fairness tools 💰
+
+### **Layer 10 – Governance & Security**
+- **10.1 PII Detection & Redaction:** *Identify and mask sensitive data (SSN, emails, etc.)*
+  - Presidio ✅ (Microsoft), scrubadub ✅, detect-secrets ✅
+  - Custom regex/NER patterns ✅
+  - AWS Macie 💰, Google DLP 💰
+- **10.2 Policy Engines:** *Enforce access control, content filtering, guardrails*
+  - OPA ✅ (Open Policy Agent), Oso ✅, Casbin ✅
+  - Guardrails AI ✅, NeMo Guardrails ✅ (NVIDIA)
+  - Commercial policy engines 💰
+- **10.3 Secrets Management:** *Store API keys, credentials securely*
+  - HashiCorp Vault ✅, SOPS ✅ (Mozilla), git-crypt ✅
+  - Sealed Secrets ✅ (K8s)
+  - AWS Secrets Manager 💰, GCP Secret Manager 💰
+- **10.4 RBAC & Identity:** *Role-based access control, authentication*
+  - Keycloak ✅, Authelia ✅, Ory Kratos ✅
+  - Auth0 🎁(7k MAU), Supabase Auth 🎁(50k MAU)
+  - Okta 💰, Auth0 Enterprise 💰
+- **10.5 Red-Teaming & Jailbreak Testing:** *Test agent safety, prompt injection resistance*
+  - PromptInject ✅, Garak ✅, PyRIT ✅ (Microsoft)
+  - Custom adversarial testing ✅
+  - Commercial red-team services 💰
+- **10.6 Data Lineage:** *Track data provenance, model attributions*
+  - OpenLineage ✅, Marquez ✅
+  - MLflow Tracking ✅
+  - Monte Carlo 💰, Datafold 💰
+
+### **Layer 11 – Applications & Integration**
+- **11.1 API Frameworks:** *Build REST/GraphQL APIs for agent backends*
+  - FastAPI ✅, Flask ✅, Django REST ✅, Express.js ✅
+  - Hono ✅ (edge runtime)
+  - Cloudflare Workers 🎁(100k requests/day), Vercel 🎁(100GB bandwidth)
+- **11.2 UI Frameworks:** *Create web interfaces for agents*
+  - Streamlit ✅, Gradio ✅, Reflex ✅, Mesop ✅
+  - Next.js ✅, React ✅, Vue ✅
+  - Streamlit Cloud 🎁(unlimited), Vercel 🎁(hobby), Netlify 🎁(100GB)
+- **11.3 Enterprise Connectors:** *Integrate with CRM, ITSM, ERP systems*
+  - n8n ✅ (400+ connectors), Airbyte ✅
+  - Official SDKs ✅ (Salesforce, ServiceNow, etc.)
+  - Zapier 🎁(100 tasks/month), Make 🎁(1k ops/month)
+- **11.4 Messaging Platforms:** *Deploy agents on Slack, Teams, Discord*
+  - Slack Bolt ✅, Discord.py ✅, Microsoft Bot Framework ✅
+  - Webhook integrations ✅
+  - Slack free tier 🎁, Discord free 🎁
+- **11.5 Event Buses:** *Decouple services with pub/sub messaging*
+  - Apache Kafka ✅, NATS ✅, RabbitMQ ✅
+  - Redis Pub/Sub ✅
+  - AWS EventBridge 💰, Google Pub/Sub 💰
+- **11.6 Workflow Automation:** *Low-code automation (Zapier alternatives)*
+  - n8n ✅ (self-hosted), Windmill ✅, Automatisch ✅
+  - Zapier 🎁(100 tasks/month), Make 🎁(1k ops/month)
+  - Zapier Pro 💰, Workato 💰

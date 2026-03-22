@@ -67,6 +67,7 @@ class ChangeTracker:
             "/tmp/dropbox_sync_state.json"
         )
         self._state: Optional[SyncState] = None
+        self._access_token: Optional[str] = None
         self._load_state()
 
     def _load_state(self):
@@ -91,6 +92,7 @@ class ChangeTracker:
                         ],
                         has_more=data.get("has_more", False)
                     )
+                    self._access_token = data.get("access_token")
             else:
                 self._state = SyncState()
         except Exception as e:
@@ -103,6 +105,7 @@ class ChangeTracker:
             data = {
                 "cursor": self._state.cursor,
                 "last_sync": self._state.last_sync,
+                "access_token": self._access_token,
                 "pending_changes": [
                     {
                         "path": c.path,
@@ -159,6 +162,7 @@ class ChangeTracker:
 
             self._state.cursor = cursor
             self._state.last_sync = datetime.utcnow().isoformat()
+            self._access_token = access_token  # Store for auto-sync
             self._save_state()
 
             logger.info(f"Initialized sync cursor")
@@ -302,3 +306,22 @@ def get_pending_changes() -> List[FileChange]:
 def mark_changes_processed(paths: List[str] = None):
     """Mark changes as processed (convenience function)."""
     get_change_tracker().mark_processed(paths)
+
+
+async def auto_fetch_changes() -> List[FileChange]:
+    """
+    Auto-fetch changes using stored access token.
+    Called by webhook handler when notification received.
+    """
+    tracker = get_change_tracker()
+    if not tracker._access_token:
+        logger.warning("No stored access token, cannot auto-fetch changes")
+        return []
+
+    try:
+        changes = await tracker.get_changes(tracker._access_token)
+        logger.info(f"Auto-fetched {len(changes)} changes")
+        return changes
+    except Exception as e:
+        logger.error(f"Auto-fetch failed: {e}")
+        return []

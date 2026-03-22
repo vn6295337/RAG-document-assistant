@@ -1,0 +1,7 @@
+{
+  "ui": {
+    "inlineThinkingMode": "full",
+    "terminalBackgroundPollingInterval": 60,
+    "autoThemeSwitching": false
+  }
+}

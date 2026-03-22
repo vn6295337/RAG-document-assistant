@@ -53,6 +53,7 @@ Execute a zero-storage query with advanced retrieval pipeline. Re-fetches text f
   "access_token": "dropbox_access_token",
   "top_k": 3,
   "use_rewriting": true,
+  "rewrite_strategy": "auto",
   "use_reranking": true,
   "use_context_shaping": true,
   "token_budget": 2000
@@ -66,10 +67,21 @@ Execute a zero-storage query with advanced retrieval pipeline. Re-fetches text f
 | `query` | string | required | User's question |
 | `access_token` | string | required | Dropbox OAuth token |
 | `top_k` | int | 3 | Number of chunks to return |
-| `use_rewriting` | bool | true | Enable query expansion/rewriting |
+| `use_rewriting` | bool | true | Enable query rewriting |
+| `rewrite_strategy` | string | "auto" | Rewriting strategy (see below) |
 | `use_reranking` | bool | true | Enable cross-encoder reranking |
 | `use_context_shaping` | bool | true | Enable token budget & deduplication |
 | `token_budget` | int | 2000 | Max tokens for context |
+
+**Rewrite Strategies:**
+
+| Strategy | LLM Call | Description |
+|----------|----------|-------------|
+| `expand` | No | Rule-based synonym expansion (fast) |
+| `multi` | Yes | LLM generates multiple query variants |
+| `decompose` | Yes | LLM breaks complex queries into sub-queries |
+| `auto` | Maybe | Auto-selects based on query complexity |
+| `none` | No | Disable rewriting entirely |
 
 **Response:**
 ```json
@@ -84,13 +96,22 @@ Execute a zero-storage query with advanced retrieval pipeline. Re-fetches text f
   ],
   "pipeline_meta": {
     "rewriting_enabled": true,
+    "rewrite_strategy_requested": "auto",
+    "rewrite_strategy": "decompose",
+    "query_variants": 3,
+    "rewritten_queries": [
+      "What are the payment terms?",
+      "payment deadline requirements",
+      "invoice due date policy"
+    ],
     "reranking_enabled": true,
     "context_shaping_enabled": true,
-    "query_variants": 2,
     "initial_matches": 9,
-    "rerank_model": "cross-encoder",
+    "rerank_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "reranked": true,
     "original_tokens": 1500,
-    "final_tokens": 1200
+    "final_tokens": 1200,
+    "chunks_removed": 2
   },
   "error": null
 }
@@ -98,8 +119,12 @@ Execute a zero-storage query with advanced retrieval pipeline. Re-fetches text f
 
 **Pipeline Flow:**
 ```
-1. Query Rewriting ──► Expand query with synonyms/variants
-         │
+1. Query Rewriting ──► Strategy-based query transformation
+   │                   - expand: synonym expansion (no LLM)
+   │                   - multi: LLM generates variants
+   │                   - decompose: LLM breaks into sub-queries
+   │                   - auto: choose based on complexity
+   ▼
 2. Multi-Query Search ──► Search Pinecone with all variants
          │
 3. Deduplicate ──► Remove duplicate chunks across variants

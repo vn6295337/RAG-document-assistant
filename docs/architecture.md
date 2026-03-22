@@ -72,8 +72,11 @@ QUERY TIME (every search) - ADVANCED RETRIEVAL PIPELINE
   "What does the contract say?"
            │
            ▼
-  ─────────────────────────────────────► 1. QUERY REWRITING
-                                            Expand with synonyms/variants
+  ─────────────────────────────────────► 1. QUERY REWRITING (strategy-based)
+                                            - expand: synonyms (no LLM)
+                                            - multi: LLM variants
+                                            - decompose: LLM sub-queries
+                                            - auto: choose by complexity
                                               │
                                               ▼
                                          2. MULTI-QUERY SEARCH
@@ -110,7 +113,11 @@ RETRIEVAL FEATURES COMPARISON
 
   Feature              │ /query-secure  │ /query (legacy)
   ─────────────────────┼────────────────┼─────────────────
-  Query Rewriting      │ ✅ Enabled      │ ✅ Enabled
+  Query Rewriting      │ ✅ Full         │ ✅ Full
+    - expand (synonyms)│ ✅              │ ✅
+    - multi (LLM)      │ ✅              │ ✅
+    - decompose (LLM)  │ ✅              │ ✅
+    - auto             │ ✅              │ ✅
   Semantic Search      │ ✅ Pinecone     │ ✅ Pinecone
   BM25 Keyword Search  │ ❌ N/A          │ ✅ Local corpus
   Hybrid Fusion        │ ❌ N/A          │ ✅ RRF fusion
