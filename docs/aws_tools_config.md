@@ -13,6 +13,20 @@ This document maps RAG pipeline stages to tools, services, and implementation st
 
 ---
 
+## Operational Update — 2026-03-23
+
+This AWS track was updated in production today with the following operational changes:
+
+- `/api/query-secure` now uses the secure orchestrator wrapper in AWS deployments.
+- `/api/webhook/sync/*` endpoints now require `SYNC_ADMIN_TOKEN`.
+- Dropbox webhook POST requests now require a valid signature and no longer trigger inline change-fetch work.
+- The AWS image now includes the spaCy model required by Presidio so PII detection does not try to install packages at Lambda runtime.
+- The default LLM runtime order is now `Groq -> Gemini`.
+- OpenRouter is no longer part of the automatic provider cascade.
+- Bedrock embeddings remain the AWS-native path and now use retry/backoff handling for throttling.
+
+---
+
 ## 1. Data Preparation
 
 | Step                     | Tool/Service                 | Status | Notes                                       |

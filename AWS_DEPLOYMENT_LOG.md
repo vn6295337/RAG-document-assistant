@@ -740,3 +740,62 @@ curl https://ur1vowo3r2.execute-api.us-east-1.amazonaws.com/api/health
 | `AI_CONTEXT.md` | Technical context for AI assistants |
 | `README.md` | Project overview |
 | `SECURITY.md` | Security architecture |
+
+---
+
+## 13. 2026-03-23 Production Hardening Update
+
+### Summary
+
+Today's work focused on closing the gap between the documented AWS security design and the code actually running in production, then redeploying and validating the fixes on the live AWS stack.
+
+### Code Changes Implemented
+
+- Wired `/api/query-secure` to prefer `src.orchestrator_secure.orchestrate_zero_storage_secure` when the AWS track is present, instead of calling the shared zero-storage orchestrator directly.
+- Passed `use_hyde` through the secure orchestrator into the shared zero-storage orchestration path.
+- Hardened Dropbox webhook handling:
+  - Missing signatures are now rejected.
+  - Signature validation is strict in production.
+  - Webhook POST no longer attempts inline Dropbox delta fetches.
+- Hardened sync management endpoints:
+  - Added `SYNC_ADMIN_TOKEN` protection for `/api/webhook/sync/*`.
+  - Removed persisted Dropbox access-token storage from sync state.
+- Fixed Presidio runtime behavior in Lambda by baking the required spaCy model into the AWS container image.
+- Added AWS-only retry/backoff handling for Bedrock embedding throttling in `src/ingestion/embeddings.py`.
+- Removed OpenRouter from the automatic LLM fallback cascade.
+- Changed default LLM order to:
+  1. Groq `llama-3.1-8b-instant`
+  2. Gemini `gemini-2.5-flash`
+
+### Documentation Updated
+
+- `docs/api_reference.md`
+- `docs/aws_tools_config.md`
+- `docs/process-flow.md`
+- `docs/architecture.md`
+- `README.md`
+
+### AWS Configuration Changes Applied
+
+- Added/verified Lambda environment variables:
+  - `SYNC_ADMIN_TOKEN`
+  - `DROPBOX_APP_SECRET`
+  - `PINECONE_API_KEY`
+- Confirmed repeated CodeBuild -> ECR -> Lambda image deployment flow during debugging.
+
+### Production Validation Completed
+
+- `/api/webhook/sync/status`
+  - returns `401` without admin token
+  - succeeds with valid `X-Admin-Token`
+- `/api/webhook/dropbox`
+  - rejects unsigned POST requests with `Invalid or missing webhook signature`
+- `/api/query-secure`
+  - now routes through the secure orchestrator
+  - returns `200 OK` after the Presidio and Bedrock fixes
+
+### Operational Notes
+
+- OpenRouter remains configurable in code but is no longer in the default runtime cascade.
+- Bedrock embeddings remain AWS-native; throttling is now mitigated with retry/backoff rather than by switching providers.
+- The live production behavior now matches the intended AWS hardening model more closely than the earlier deployment.
