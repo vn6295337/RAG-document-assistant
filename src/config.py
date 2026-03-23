@@ -90,7 +90,7 @@ OPENROUTER_API_KEY = get_optional("OPENROUTER_API_KEY")
 # Model names
 GEMINI_MODEL = get_optional("GEMINI_MODEL", "gemini-2.5-flash")
 GROQ_MODEL = get_optional("GROQ_MODEL", "llama-3.1-8b-instant")
-OPENROUTER_MODEL = get_optional("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct:free")
+OPENROUTER_MODEL = get_optional("OPENROUTER_MODEL", "google/gemma-3-27b-it:free")
 
 # Supabase (Optional - not used in current deployment)
 SUPABASE_URL = get_optional("SB_PROJECT_URL")

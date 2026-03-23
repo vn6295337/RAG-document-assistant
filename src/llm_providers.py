@@ -53,7 +53,7 @@ def call_llm(
         elif provider == "groq":
             model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
         else:
-            model = os.getenv("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct:free")
+            model = os.getenv("OPENROUTER_MODEL", "google/gemma-3-27b-it:free")
 
     # 2. Build LiteLLM model string
     litellm_model = f"{PROVIDER_MAP.get(provider, '')}{model}"

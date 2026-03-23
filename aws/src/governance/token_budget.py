@@ -56,7 +56,7 @@ MODEL_COSTS: Dict[str, CostConfig] = {
     "groq/llama-3.1-70b-versatile": CostConfig(0.0, 0.0),
 
     # OpenRouter (various)
-    "openrouter/mistral-7b-instruct:free": CostConfig(0.0, 0.0),
+    "openrouter/google/gemma-3-27b-it:free": CostConfig(0.0, 0.0),
     "openrouter/llama-3.1-8b-instruct": CostConfig(0.0, 0.0),
 
     # OpenAI (for reference if used)

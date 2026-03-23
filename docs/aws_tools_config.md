@@ -112,7 +112,7 @@ This document maps RAG pipeline stages to tools, services, and implementation st
 ```
 1. gemini/gemini-2.5-flash (primary)
 2. groq/llama-3.1-8b-instant (fallback)
-3. openrouter/mistral-7b-instruct:free (final fallback)
+3. openrouter/google/gemma-3-27b-it:free (final fallback)
 ```
 
 ---
