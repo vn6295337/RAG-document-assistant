@@ -5,7 +5,7 @@ import shutil
 import httpx
 from pathlib import Path
 from typing import List
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from src.api.models import (
     QueryRequest, QueryResponse,
     IngestRequest, IngestResponse,
@@ -269,7 +269,7 @@ async def embed_chunks(request: dict):
 
 
 @router.post("/query-secure")
-async def query_secure(request: dict):
+async def query_secure(http_request: Request, request: dict):
     """
     ZERO-STORAGE QUERY with advanced retrieval pipeline.
 
@@ -306,10 +306,6 @@ async def query_secure(request: dict):
     9. Send to LLM for answer generation
     10. Return answer (text never stored)
     """
-    from src.ingestion.embeddings import get_embedding
-    from pinecone import Pinecone
-    import src.config as cfg
-
     query = request.get("query", "")
     access_token = request.get("access_token")
     top_k = request.get("top_k", 3)
@@ -320,6 +316,7 @@ async def query_secure(request: dict):
     use_reranking = request.get("use_reranking", True)
     use_context_shaping = request.get("use_context_shaping", True)
     token_budget = request.get("token_budget", 2000)
+    use_hyde = request.get("use_hyde", False)
 
     if not query:
         return {"error": "No query provided", "answer": ""}
@@ -327,17 +324,36 @@ async def query_secure(request: dict):
     if not access_token:
         return {"error": "Dropbox access token required for zero-storage queries", "answer": ""}
 
-    # Call the unified orchestrator
-    result = await orchestrate_zero_storage(
-        query=query,
-        access_token=access_token,
-        top_k=top_k,
-        use_rewriting=use_rewriting,
-        rewrite_strategy=rewrite_strategy,
-        use_reranking=use_reranking,
-        use_context_shaping=use_context_shaping,
-        token_budget=token_budget
-    )
+    client_host = http_request.client.host if http_request.client else None
+
+    # Prefer the AWS secure wrapper when it is available.
+    try:
+        from src.orchestrator_secure import orchestrate_zero_storage_secure
+
+        result = await orchestrate_zero_storage_secure(
+            query=query,
+            access_token=access_token,
+            top_k=top_k,
+            use_rewriting=use_rewriting,
+            rewrite_strategy=rewrite_strategy,
+            use_reranking=use_reranking,
+            use_context_shaping=use_context_shaping,
+            token_budget=token_budget,
+            use_hyde=use_hyde,
+            ip_address=client_host
+        )
+    except ImportError:
+        result = await orchestrate_zero_storage(
+            query=query,
+            access_token=access_token,
+            top_k=top_k,
+            use_rewriting=use_rewriting,
+            rewrite_strategy=rewrite_strategy,
+            use_reranking=use_reranking,
+            use_context_shaping=use_context_shaping,
+            token_budget=token_budget
+        )
+
     return result
 
 

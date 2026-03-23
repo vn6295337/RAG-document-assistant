@@ -677,6 +677,7 @@ async def orchestrate_zero_storage(
     use_reranking: bool = True,
     use_context_shaping: bool = True,
     token_budget: int = 2000,
+    use_hyde: bool = False,
     llm_params: Dict[str, Any] = None
 ) -> Dict[str, Any]:
     """
@@ -711,7 +712,8 @@ async def orchestrate_zero_storage(
         metadata={
             "top_k": top_k,
             "use_rewriting": use_rewriting,
-            "rewrite_strategy": rewrite_strategy
+            "rewrite_strategy": rewrite_strategy,
+            "use_hyde": use_hyde
         }
     )
 
@@ -720,7 +722,9 @@ async def orchestrate_zero_storage(
         "rewriting_enabled": use_rewriting,
         "rewrite_strategy_requested": rewrite_strategy,
         "reranking_enabled": use_reranking,
-        "context_shaping_enabled": use_context_shaping
+        "context_shaping_enabled": use_context_shaping,
+        "hyde_requested": use_hyde,
+        "hyde_used": False
     }
 
     try:
@@ -756,17 +760,34 @@ async def orchestrate_zero_storage(
         seen_ids = set()
 
         for q in queries_to_search:
-            query_embedding = get_embedding(q, provider="sentence-transformers", dim=384)
-            results = index.query(
-                vector=query_embedding,
-                top_k=fetch_k,
-                include_metadata=True
-            )
+            search_queries = [q]
+            if use_hyde:
+                try:
+                    from src.retrieval.hyde import generate_hypothetical_document
+
+                    hyde_result = generate_hypothetical_document(q)
+                    hypothetical = hyde_result.hypothetical_doc.strip()
+                    if hypothetical and hypothetical != q:
+                        search_queries.insert(0, hypothetical)
+                        pipeline_meta["hyde_used"] = True
+                        pipeline_meta["hyde_model"] = hyde_result.model_used
+                except Exception as e:
+                    pipeline_meta["hyde_error"] = str(e)[:100]
+
+            for search_query in search_queries:
+                query_embedding = get_embedding(
+                    search_query, provider="sentence-transformers", dim=384
+                )
+                results = index.query(
+                    vector=query_embedding,
+                    top_k=fetch_k,
+                    include_metadata=True
+                )
             # Deduplicate across query variants
-            for match in results.matches:
-                if match.id not in seen_ids:
-                    seen_ids.add(match.id)
-                    all_matches.append(match)
+                for match in results.matches:
+                    if match.id not in seen_ids:
+                        seen_ids.add(match.id)
+                        all_matches.append(match)
 
         if not all_matches:
             return {"answer": "No relevant documents found.", "citations": [], "pipeline_meta": pipeline_meta}

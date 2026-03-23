@@ -86,8 +86,11 @@ class DropboxWebhookHandler:
             True if signature is valid
         """
         if not self.app_secret:
+            if os.getenv("ENV", "development") == "production":
+                logger.error("DROPBOX_APP_SECRET missing in production")
+                return False
             logger.warning("No app secret configured, skipping signature verification")
-            return True  # Allow in dev, but log warning
+            return True  # Allow in non-production only
 
         if not signature:
             logger.warning("No signature header in webhook request")
@@ -129,13 +132,12 @@ class DropboxWebhookHandler:
         import json
 
         # Verify signature if app secret is configured
-        if self.app_secret and signature:
-            if not self.verify_signature(body, signature):
-                return ChangeNotification(
-                    accounts=[],
-                    is_valid=False,
-                    error="Invalid webhook signature"
-                )
+        if not self.verify_signature(body, signature):
+            return ChangeNotification(
+                accounts=[],
+                is_valid=False,
+                error="Invalid or missing webhook signature"
+            )
 
         try:
             data = json.loads(body.decode('utf-8'))

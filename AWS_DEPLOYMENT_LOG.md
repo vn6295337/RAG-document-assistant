@@ -215,6 +215,7 @@ Security guards are wired into the RAG pipeline via middleware and a secure orch
 - Pre-request: Validate input, detect/scrub PII
 - Post-response: Moderate output, audit logging
 - Non-blocking: Falls back gracefully if security modules unavailable
+- Operational note: the production `/api/query-secure` route now prefers the secure orchestrator wrapper when the AWS track is present
 
 ```python
 from src.api.security_middleware import (
@@ -235,7 +236,7 @@ if error:
 ```
 
 #### **Secure Orchestrator** (`aws/src/orchestrator_secure.py`)
-Wraps `orchestrate_zero_storage` with full security pipeline:
+Wraps `orchestrate_zero_storage` with full security pipeline and optional HyDE search:
 
 ```python
 from src.orchestrator_secure import orchestrate_zero_storage_secure
@@ -243,6 +244,7 @@ from src.orchestrator_secure import orchestrate_zero_storage_secure
 result = await orchestrate_zero_storage_secure(
     query=query,
     access_token=token,
+    use_hyde=True,
     enable_security=True,
     block_high_risk_injection=True,
     scrub_pii_input=True,
@@ -491,38 +493,44 @@ backups = list_backups()
   1. Register webhook URL in Dropbox App Console
   2. Dropbox sends GET challenge for verification
   3. On file changes, Dropbox sends POST notification
-  4. We use cursor-based delta sync to get actual changes
-  5. Changes are queued for re-indexing
+4. Authenticated sync endpoints use cursor-based delta sync to get actual changes
+5. Changes are queued for re-indexing
 
 **Webhook Endpoints:**
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/webhook/dropbox` | GET | Verification challenge |
-| `/api/webhook/dropbox` | POST | Change notifications |
-| `/api/sync/status` | GET | Current sync status |
-| `/api/sync/init` | POST | Initialize cursor |
-| `/api/sync/check` | POST | Get changes since last sync |
-| `/api/sync/pending` | GET | List pending changes |
-| `/api/sync/mark-processed` | POST | Mark changes as processed |
+| `/api/webhook/dropbox` | POST | Signed change notifications, acknowledged immediately |
+| `/api/webhook/sync/status` | GET | Current sync status (`X-Admin-Token` required) |
+| `/api/webhook/sync/init` | POST | Initialize cursor (`X-Admin-Token` required) |
+| `/api/webhook/sync/check` | POST | Get changes since last sync (`X-Admin-Token` required) |
+| `/api/webhook/sync/pending` | GET | List pending changes (`X-Admin-Token` required) |
+| `/api/webhook/sync/mark-processed` | POST | Mark changes as processed (`X-Admin-Token` required) |
 
 ```python
 # Initialize sync (one-time setup)
-POST /api/sync/init
+POST /api/webhook/sync/init
+X-Admin-Token: <SYNC_ADMIN_TOKEN>
 {"access_token": "dropbox_token", "path": ""}
 
 # Check for changes
-POST /api/sync/check
+POST /api/webhook/sync/check
+X-Admin-Token: <SYNC_ADMIN_TOKEN>
 {"access_token": "dropbox_token"}
 # Returns: {"changes": [{"path": "/doc.pdf", "type": "modified"}]}
 
 # Get pending changes
-GET /api/sync/pending
+GET /api/webhook/sync/pending
+X-Admin-Token: <SYNC_ADMIN_TOKEN>
 # Returns: {"pending": [...], "count": 3}
 
 # After re-indexing, mark as processed
-POST /api/sync/mark-processed
+POST /api/webhook/sync/mark-processed
+X-Admin-Token: <SYNC_ADMIN_TOKEN>
 {"paths": ["/doc.pdf"]}
 ```
+
+Webhook notifications no longer trigger Dropbox delta fetches inline. The webhook only validates the signature and acknowledges receipt; operators must call the authenticated sync endpoints with a valid Dropbox token.
 
 **Dropbox App Console Setup:**
 1. Go to https://www.dropbox.com/developers/apps

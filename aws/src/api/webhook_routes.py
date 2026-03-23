@@ -2,11 +2,27 @@
 """Webhook routes for Dropbox change detection."""
 
 import logging
+import os
 from fastapi import APIRouter, Request, Response, HTTPException
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
+
+
+def _require_sync_admin(request: Request):
+    """Protect operational sync endpoints with a shared admin token."""
+    expected_token = os.getenv("SYNC_ADMIN_TOKEN")
+    if not expected_token:
+        raise HTTPException(status_code=503, detail="SYNC_ADMIN_TOKEN not configured")
+
+    provided_token = request.headers.get("X-Admin-Token", "")
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        provided_token = auth_header.split(" ", 1)[1].strip()
+
+    if provided_token != expected_token:
+        raise HTTPException(status_code=401, detail="Invalid admin token")
 
 
 @router.get("/dropbox")
@@ -63,21 +79,13 @@ async def dropbox_webhook_notification(request: Request):
     if result.accounts:
         logger.info(f"Dropbox change notification for accounts: {result.accounts}")
 
-    # Auto-fetch changes using stored token
-    from src.sync.change_tracker import auto_fetch_changes
-    try:
-        changes = await auto_fetch_changes()
-        logger.info(f"Auto-fetched {len(changes)} changes from webhook")
-
-        # Send email notification if changes found
-        if changes:
-            await _send_change_notification(changes)
-    except Exception as e:
-        logger.error(f"Auto-fetch in webhook failed: {e}")
-        changes = []
-
-    # Always return 200 OK to acknowledge receipt
-    return {"status": "ok", "accounts_notified": len(result.accounts), "changes_fetched": len(changes)}
+    # Acknowledge immediately. Dropbox webhooks do not include an OAuth token,
+    # so actual delta fetching must happen through an authenticated sync call.
+    return {
+        "status": "ok",
+        "accounts_notified": len(result.accounts),
+        "message": "Notification accepted. Fetch changes via authenticated sync endpoints."
+    }
 
 
 async def _send_change_notification(changes):
@@ -121,7 +129,7 @@ RAG Document Assistant
 
 
 @router.get("/sync/status")
-async def sync_status():
+async def sync_status(request: Request):
     """
     Get current sync status.
 
@@ -130,6 +138,7 @@ async def sync_status():
     - last_sync: Timestamp of last sync
     - pending_count: Number of pending changes
     """
+    _require_sync_admin(request)
     from src.sync.change_tracker import get_change_tracker
 
     tracker = get_change_tracker()
@@ -147,6 +156,7 @@ async def sync_init(request: Request):
     - access_token: Dropbox OAuth token
     - path: Folder path to sync (empty = root)
     """
+    _require_sync_admin(request)
     from src.sync.change_tracker import get_change_tracker
 
     body = await request.json()
@@ -180,6 +190,7 @@ async def sync_check(request: Request):
 
     Returns list of file changes.
     """
+    _require_sync_admin(request)
     from src.sync.change_tracker import get_change_tracker
 
     body = await request.json()
@@ -212,10 +223,11 @@ async def sync_check(request: Request):
 
 
 @router.get("/sync/pending")
-async def sync_pending():
+async def sync_pending(request: Request):
     """
     Get pending changes that haven't been processed yet.
     """
+    _require_sync_admin(request)
     from src.sync.change_tracker import get_pending_changes
 
     changes = get_pending_changes()
@@ -240,6 +252,7 @@ async def sync_mark_processed(request: Request):
     Request body:
     - paths: List of file paths to mark as processed (optional, all if empty)
     """
+    _require_sync_admin(request)
     from src.sync.change_tracker import mark_changes_processed
 
     body = await request.json()

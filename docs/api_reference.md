@@ -56,6 +56,7 @@ Execute a zero-storage query with advanced retrieval pipeline. Re-fetches text f
   "rewrite_strategy": "auto",
   "use_reranking": true,
   "use_context_shaping": true,
+  "use_hyde": false,
   "token_budget": 2000
 }
 ```
@@ -71,6 +72,7 @@ Execute a zero-storage query with advanced retrieval pipeline. Re-fetches text f
 | `rewrite_strategy` | string | "auto" | Rewriting strategy (see below) |
 | `use_reranking` | bool | true | Enable cross-encoder reranking |
 | `use_context_shaping` | bool | true | Enable token budget & deduplication |
+| `use_hyde` | bool | false | Enable HyDE expansion before vector search |
 | `token_budget` | int | 2000 | Max tokens for context |
 
 **Rewrite Strategies:**
@@ -139,6 +141,8 @@ Execute a zero-storage query with advanced retrieval pipeline. Re-fetches text f
          │
 8. Return ──► Answer + citations (text never stored)
 ```
+
+**Security Note:** In the AWS deployment, `/query-secure` runs through the secure orchestrator, which adds prompt-injection checks, optional PII scrubbing, output moderation, and audit metadata.
 
 **Note:** BM25 keyword search is not available in zero-storage mode (requires local text corpus). Use `/query` endpoint for full hybrid search with local storage.
 
