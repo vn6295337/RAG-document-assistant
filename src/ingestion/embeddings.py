@@ -1,41 +1,53 @@
 # src/ingestion/embeddings.py
-"""
-Lean Embedding generation for RAG pipeline using AWS Bedrock.
-"""
+"""Lean embedding generation for the RAG pipeline using AWS Bedrock."""
 
 import hashlib
 import struct
 import json
 import os
+import time
 from typing import List, Dict, Optional
 
 def _get_bedrock_embedding(text: str, model_id: str = "amazon.titan-embed-text-v2:0") -> List[float]:
     """
     Get embedding from AWS Bedrock (Native).
     """
-    try:
-        import boto3
-        region = os.getenv("AWS_REGION", "us-east-1")
-        bedrock = boto3.client(service_name="bedrock-runtime", region_name=region)
-        
-        # Titan v2 supports 256, 512, 1024 dimensions
-        payload = {
-            "inputText": text,
-            "dimensions": 1024,
-            "normalize": True
-        }
-        
-        response = bedrock.invoke_model(
-            body=json.dumps(payload),
-            modelId=model_id,
-            accept="application/json",
-            contentType="application/json"
-        )
-        
-        response_body = json.loads(response.get("body").read())
-        return response_body.get("embedding", [])
-    except Exception as e:
-        raise RuntimeError(f"Bedrock embedding failed: {str(e)}")
+    import boto3
+
+    region = os.getenv("AWS_REGION", "us-east-1")
+    max_retries = int(os.getenv("BEDROCK_EMBEDDING_MAX_RETRIES", "6"))
+    backoff_seconds = float(os.getenv("BEDROCK_EMBEDDING_BACKOFF_SECONDS", "1.5"))
+    dimensions = int(os.getenv("BEDROCK_EMBEDDING_DIMENSIONS", "1024"))
+    model_id = os.getenv("BEDROCK_EMBEDDING_MODEL_ID", model_id)
+
+    bedrock = boto3.client(service_name="bedrock-runtime", region_name=region)
+
+    payload = {
+        "inputText": text,
+        "dimensions": dimensions,
+        "normalize": True
+    }
+
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            response = bedrock.invoke_model(
+                body=json.dumps(payload),
+                modelId=model_id,
+                accept="application/json",
+                contentType="application/json"
+            )
+            response_body = json.loads(response.get("body").read())
+            return response_body.get("embedding", [])
+        except Exception as e:
+            last_error = e
+            error_text = str(e)
+            is_throttled = "ThrottlingException" in error_text or "Too many requests" in error_text
+            if not is_throttled or attempt == max_retries - 1:
+                break
+            time.sleep(backoff_seconds * (2 ** attempt))
+
+    raise RuntimeError(f"Bedrock embedding failed: {str(last_error)}")
 
 def _pseudo_vector_from_text(text: str, dim: int = 128) -> List[float]:
     """Deterministic pseudo-embedding for testing."""
@@ -58,15 +70,14 @@ def get_embedding(
     model_name: Optional[str] = None
 ) -> List[float]:
     """
-    Lean provider getter. Default is now Bedrock.
+    Lean provider getter.
+
+    This AWS deployment uses Bedrock embeddings for all providers.
+    Legacy provider labels are accepted for compatibility and mapped to Bedrock.
     """
-    if provider == "bedrock":
-        return _get_bedrock_embedding(text, model_id=model_name or "amazon.titan-embed-text-v2:0")
-    elif provider == "local":
-        return _pseudo_vector_from_text(text, dim=dim)
-    else:
-        # Fallback to bedrock for any other provider in this lean version
-        return _get_bedrock_embedding(text)
+    return _get_bedrock_embedding(
+        text, model_id=model_name or "amazon.titan-embed-text-v2:0"
+    )
 
 def batch_embed_chunks(
     chunks: List[Dict],
