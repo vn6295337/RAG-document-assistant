@@ -2,18 +2,39 @@
 import os
 import time
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from litellm import completion
 
 logger = logging.getLogger(__name__)
 
 # Model mapping for LiteLLM
-# LiteLLM uses prefixes like "gemini/", "groq/", "openrouter/"
+# LiteLLM uses prefixes like "gemini/" and "groq/"
 PROVIDER_MAP = {
     "gemini": "gemini/",
     "groq": "groq/",
     "openrouter": "openrouter/"
 }
+
+
+def _default_model_for_provider(provider: str) -> str:
+    if provider == "groq":
+        return os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    if provider == "gemini":
+        return os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    return os.getenv("OPENROUTER_MODEL", "google/gemma-3-27b-it:free")
+
+
+def _build_attempts(provider: Optional[str], model: Optional[str]) -> List[Tuple[str, str]]:
+    """Build ordered provider/model attempts for the non-streaming call path."""
+    if provider:
+        return [(provider, model or _default_model_for_provider(provider))]
+
+    attempts: List[Tuple[str, str]] = []
+    if os.getenv("GROQ_API_KEY"):
+        attempts.append(("groq", model or _default_model_for_provider("groq")))
+    if os.getenv("GEMINI_API_KEY"):
+        attempts.append(("gemini", model or _default_model_for_provider("gemini")))
+    return attempts
 
 def call_llm(
     prompt: str,
@@ -30,7 +51,7 @@ def call_llm(
     Args:
         prompt: User question
         context: Retrieved document context
-        provider: 'gemini', 'groq', or 'openrouter' (default: priority cascade)
+        provider: 'groq' or 'gemini' (default: groq primary, gemini fallback)
         model: Specific model name (optional)
         temperature: Sampling temperature
         max_tokens: Max output tokens
@@ -38,27 +59,14 @@ def call_llm(
     Returns:
         Dict with 'text' and 'meta'
     """
-    # 1. Determine provider and model from environment if not provided
-    if not provider:
-        if os.getenv("GEMINI_API_KEY"):
-            provider = "gemini"
-        elif os.getenv("GROQ_API_KEY"):
-            provider = "groq"
-        else:
-            provider = "openrouter"
+    attempts = _build_attempts(provider, model)
+    if not attempts:
+        return {
+            "text": "",
+            "meta": {"error": "No configured LLM providers available"}
+        }
 
-    if not model:
-        if provider == "gemini":
-            model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-        elif provider == "groq":
-            model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-        else:
-            model = os.getenv("OPENROUTER_MODEL", "google/gemma-3-27b-it:free")
-
-    # 2. Build LiteLLM model string
-    litellm_model = f"{PROVIDER_MAP.get(provider, '')}{model}"
-
-    # 3. Construct messages
+    # Construct messages once
     messages = []
     system_content = "You are a helpful assistant that answers questions based on the provided context."
     if context:
@@ -67,35 +75,43 @@ def call_llm(
     messages.append({"role": "system", "content": system_content})
     messages.append({"role": "user", "content": prompt})
 
-    # 4. Execute call
-    start_time = time.time()
-    try:
-        response = completion(
-            model=litellm_model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            **kwargs
-        )
-        
-        text = response.choices[0].message.content
-        elapsed = time.time() - start_time
-        
-        return {
-            "text": text,
-            "meta": {
-                "provider": provider,
-                "model": model,
-                "elapsed_s": elapsed,
-                "usage": dict(response.get("usage", {}))
+    last_error = None
+    for selected_provider, selected_model in attempts:
+        litellm_model = f"{PROVIDER_MAP.get(selected_provider, '')}{selected_model}"
+        start_time = time.time()
+        try:
+            response = completion(
+                model=litellm_model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **kwargs
+            )
+
+            text = response.choices[0].message.content
+            elapsed = time.time() - start_time
+
+            return {
+                "text": text,
+                "meta": {
+                    "provider": selected_provider,
+                    "model": selected_model,
+                    "elapsed_s": elapsed,
+                    "usage": dict(response.get("usage", {}))
+                }
             }
+        except Exception as e:
+            last_error = e
+            logger.error(f"LiteLLM call failed for {litellm_model}: {str(e)}")
+
+    return {
+        "text": "",
+        "meta": {
+            "error": str(last_error) if last_error else "LLM call failed",
+            "provider": attempts[-1][0],
+            "model": attempts[-1][1]
         }
-    except Exception as e:
-        logger.error(f"LiteLLM call failed for {litellm_model}: {str(e)}")
-        return {
-            "text": "",
-            "meta": {"error": str(e), "provider": provider, "model": model}
-        }
+    }
 
 def call_llm_stream(
     prompt: str,
@@ -110,12 +126,12 @@ def call_llm_stream(
     Streaming version of unified LLM call.
     Yields chunks of text.
     """
-    # Logic similar to call_llm but returns a generator
+    # Streaming keeps a single provider selection.
     if not provider:
-        provider = "gemini" if os.getenv("GEMINI_API_KEY") else "groq"
+        provider = "groq" if os.getenv("GROQ_API_KEY") else "gemini"
     
     if not model:
-        model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash") if provider == "gemini" else os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+        model = _default_model_for_provider(provider)
 
     litellm_model = f"{PROVIDER_MAP.get(provider, '')}{model}"
 

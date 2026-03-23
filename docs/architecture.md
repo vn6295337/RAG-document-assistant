@@ -174,9 +174,8 @@ RETRIEVAL FEATURES COMPARISON
 - **Processing**: Server-side (text discarded immediately)
 
 ### LLM Providers (Cascade)
-1. **Gemini 2.5 Flash** (Primary)
-2. **Groq** - llama-3.1-8b-instant (Fallback 1)
-3. **OpenRouter** - Mistral 7B (Fallback 2)
+1. **Groq** - llama-3.1-8b-instant (Primary)
+2. **Gemini 2.5 Flash** (Fallback)
 
 ---
 

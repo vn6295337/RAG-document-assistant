@@ -100,7 +100,7 @@ This document maps RAG pipeline stages to tools, services, and implementation st
 | Grounding enforcement | Prompt engineering | ✅ | "Only use provided context" |
 | Citation instruction | Inline tagging `[1]`, `[2]` | ✅ | Embedded in prompt |
 | Citation extraction | Regex parsing | ✅ | `src/orchestrator.py` |
-| Multi-LLM cascade | Priority fallback | ✅ | Gemini → Groq → OpenRouter |
+| Multi-LLM cascade | Priority fallback | ✅ | Groq → Gemini |
 | LLM gateway | **LiteLLM** | ✅ | `src/llm_providers.py` |
 | Streaming support | SSE generator | ✅ | `call_llm_stream()` |
 | Structured response | JSON parsing | ✅ | Citations + answer |
@@ -110,9 +110,8 @@ This document maps RAG pipeline stages to tools, services, and implementation st
 
 **LLM Provider Cascade:**
 ```
-1. gemini/gemini-2.5-flash (primary)
-2. groq/llama-3.1-8b-instant (fallback)
-3. openrouter/google/gemma-3-27b-it:free (final fallback)
+1. groq/llama-3.1-8b-instant (primary)
+2. gemini/gemini-2.5-flash (fallback)
 ```
 
 ---
@@ -205,7 +204,6 @@ This document maps RAG pipeline stages to tools, services, and implementation st
 | **HuggingFace** | Inference API (free) | Embeddings |
 | **Gemini** | Free tier | Primary LLM |
 | **Groq** | Free tier | Fallback LLM |
-| **OpenRouter** | Free tier | Final fallback LLM |
 | **LangFuse** | Cloud (free) | Tracing |
 | **Dropbox** | OAuth | Document source |
 

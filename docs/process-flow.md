@@ -90,7 +90,7 @@ Privacy-first document search assistant. Users connect their Dropbox, and the sy
 │  Description                                   │  Tools/Systems                                  │
 ├────────────────────────────────────────────────┼─────────────────────────────────────────────────┤
 │  LLM reads chunks + question                   │  • LLM Providers (src/llm_providers.py)         │
-│  → Writes natural language answer              │    Priority: Gemini → Groq → OpenRouter         │
+│  → Writes natural language answer              │    Priority: Groq → Gemini                       │
 │  → Includes citations [ID:chunk_123]           │  • RAG Prompt (src/prompts/rag_prompt.py)       │
 │  → Abstains if info not found                  │  • Chain-of-thought (src/reasoning/chain.py)    │
 └────────────────────────────────────────────────┴─────────────────────────────────────────────────┘

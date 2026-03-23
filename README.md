@@ -135,7 +135,7 @@ cd frontend && npm install && npm run dev
 - **Backend**: FastAPI on HuggingFace Spaces
 - **Vector DB**: Pinecone (embeddings only)
 - **File Source**: Dropbox OAuth
-- **LLM**: Multi-provider fallback (Gemini, Groq, OpenRouter)
+- **LLM**: Multi-provider fallback (Groq primary, Gemini fallback)
 
 ## Documentation
 
