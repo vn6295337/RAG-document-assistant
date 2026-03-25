@@ -1,6 +1,9 @@
 version: 0.2
 
 phases:
+  install:
+    runtime-versions:
+      nodejs: 18
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
@@ -10,11 +13,25 @@ phases:
   build:
     commands:
       - echo Build started on `date`
+      # Backend Docker image
       - echo Building the Docker image...
       - docker build --no-cache -f aws/Dockerfile -t $REPOSITORY_URI:$IMAGE_TAG .
+      # Frontend
+      - echo Building frontend...
+      - cd frontend
+      - npm ci
+      - VITE_API_URL=$VITE_API_URL VITE_DROPBOX_APP_KEY=$VITE_DROPBOX_APP_KEY npm run build
+      - cd ..
   post_build:
     commands:
       - echo Build completed on `date`
+      # Push backend image
       - echo Pushing the Docker image...
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - echo Image pushed to $REPOSITORY_URI:$IMAGE_TAG
+      # Deploy frontend to S3 and invalidate CloudFront
+      - echo Deploying frontend to S3...
+      - aws s3 sync frontend/dist/ s3://$FRONTEND_BUCKET/ --delete
+      - echo Invalidating CloudFront cache...
+      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
+      - echo Frontend deployed
