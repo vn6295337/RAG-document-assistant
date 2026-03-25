@@ -351,7 +351,8 @@ async def query_secure(http_request: Request, request: dict):
             rewrite_strategy=rewrite_strategy,
             use_reranking=use_reranking,
             use_context_shaping=use_context_shaping,
-            token_budget=token_budget
+            token_budget=token_budget,
+            use_hyde=use_hyde
         )
 
     return result
