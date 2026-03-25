@@ -36,6 +36,14 @@ class ParsedDocument:
     def full_text(self) -> str:
         return "\n\n".join(el.text for el in self.elements if el.text.strip())
 
+    @property
+    def chars(self) -> int:
+        return len(self.full_text)
+
+    @property
+    def words(self) -> int:
+        return len(self.full_text.split())
+
 def load_document_from_bytes(file_bytes: bytes, filename: str) -> ParsedDocument:
     """
     Load and parse a single document using Amazon Textract.
