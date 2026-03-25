@@ -15,7 +15,7 @@ from pinecone import Pinecone
 
 # Default dimensions
 DIM_DETERMINISTIC = 1024
-DIM_SEMANTIC = 384  # for all-MiniLM-L6-v2
+DIM_SEMANTIC = 1024  # for AWS Bedrock Titan v2
 
 # Constants for model names
 DEFAULT_SEMANTIC_MODEL = "all-MiniLM-L6-v2"
@@ -166,7 +166,8 @@ def query_pinecone(
 
     # Generate query embedding
     if use_semantic:
-        q_emb = semantic_embedding(query_text, model_name=model_name)
+        from src.ingestion.embeddings import get_embedding
+        q_emb = get_embedding(query_text, provider="bedrock", dim=DIM_SEMANTIC)
     else:
         q_emb = deterministic_embedding(query_text)
 

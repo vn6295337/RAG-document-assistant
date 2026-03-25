@@ -776,7 +776,7 @@ async def orchestrate_zero_storage(
 
             for search_query in search_queries:
                 query_embedding = get_embedding(
-                    search_query, provider="sentence-transformers", dim=384
+                    search_query, provider="bedrock", dim=1024
                 )
                 results = index.query(
                     vector=query_embedding,

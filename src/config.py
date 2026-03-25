@@ -80,7 +80,7 @@ def get_optional(key: str, default=None):
 
 # Pinecone (Required)
 PINECONE_API_KEY = get_required("PINECONE_API_KEY")
-PINECONE_INDEX_NAME = get_optional("PINECONE_INDEX_NAME", "rag-semantic-384")
+PINECONE_INDEX_NAME = get_optional("PINECONE_INDEX_NAME", "rag-bedrock-1024")
 
 # LLM provider keys (at least one required)
 GEMINI_API_KEY = get_optional("GEMINI_API_KEY")

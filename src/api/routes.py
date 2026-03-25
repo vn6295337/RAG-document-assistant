@@ -211,7 +211,7 @@ async def embed_chunks(request: dict):
             })
 
         # Generate embeddings (text processed in memory only)
-        embedded = batch_embed_chunks(chunk_data, provider="sentence-transformers", dim=384)
+        embedded = batch_embed_chunks(chunk_data, provider="bedrock", dim=1024)
 
         # Prepare vectors for Pinecone - NO TEXT STORED
         vectors = []

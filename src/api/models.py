@@ -15,7 +15,7 @@ class QueryRequest(BaseModel):
 class IngestRequest(BaseModel):
     docs_dir: str
     output_path: str = "data/chunks.jsonl"
-    provider: str = "sentence-transformers"
+    provider: str = "bedrock"
     use_docling: bool = True
     use_structure: bool = True
 

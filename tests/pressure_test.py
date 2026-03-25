@@ -153,7 +153,7 @@ async def ingest_documents(
             json={
                 "docs_dir": docs_dir,
                 "output_path": output_path,
-                "provider": "sentence-transformers"
+                "provider": "bedrock"
             },
             timeout=INGEST_TIMEOUT
         )

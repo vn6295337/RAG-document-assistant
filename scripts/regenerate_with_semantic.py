@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 """
-Regenerate embeddings using semantic sentence-transformers model.
+Regenerate embeddings using AWS Bedrock Titan Embed v2 (1024-dim).
 
 Purpose:
-    Completely regenerates embeddings using the semantic sentence-transformers model,
+    Completely regenerates embeddings using AWS Bedrock,
     creates a new Pinecone index, and uploads the embeddings. This is a full refresh
-    of the vector database with semantic embeddings.
+    of the vector database with Bedrock embeddings.
 
 Process:
 1. Loads documents and chunks them
-2. Generates semantic embeddings (384-dim using all-MiniLM-L6-v2)
+2. Generates Bedrock embeddings (1024-dim using amazon.titan-embed-text-v2:0)
 3. Saves to data/chunks_semantic.jsonl
-4. Creates new Pinecone index with 384 dimensions
-5. Uploads semantic embeddings to new index
+4. Creates new Pinecone index with 1024 dimensions
+5. Uploads embeddings to new index
 
 Inputs:
     None (uses sample_docs directory by default)
     PINECONE_API_KEY environment variable
+    AWS credentials (for Bedrock)
 
 Outputs:
     Saves embedded chunks to data/chunks_semantic.jsonl
@@ -25,6 +26,7 @@ Outputs:
 
 Environment variables required:
     PINECONE_API_KEY: Your Pinecone API key
+    AWS_REGION: AWS region (default: us-east-1)
 
 Usage:
     python scripts/regenerate_with_semantic.py
@@ -48,7 +50,7 @@ import json
 
 def main():
     print("=" * 60)
-    print("Regenerating Embeddings with Semantic Model")
+    print("Regenerating Embeddings with AWS Bedrock Titan v2")
     print("=" * 60)
 
     # Step 1: Load and chunk documents
@@ -61,20 +63,20 @@ def main():
     chunks = chunk_documents(docs, max_tokens=300, overlap=50)
     print(f"   Generated {len(chunks)} chunks")
 
-    # Step 2: Generate semantic embeddings
-    print("\n[3/5] Generating semantic embeddings...")
-    print("   Using model: all-MiniLM-L6-v2 (384 dimensions)")
-    print("   This may take 1-2 minutes...")
+    # Step 2: Generate Bedrock embeddings
+    print("\n[3/5] Generating Bedrock embeddings...")
+    print("   Using model: amazon.titan-embed-text-v2:0 (1024 dimensions)")
+    print("   This may take a few minutes...")
 
     embedded = batch_embed_chunks(
         chunks,
-        provider="sentence-transformers",
-        model_name="all-MiniLM-L6-v2"
+        provider="bedrock",
+        dim=1024
     )
 
     # Get actual dimension from first embedding
     actual_dim = len(embedded[0]['embedding'])
-    print(f"   ✓ Generated {len(embedded)} embeddings ({actual_dim} dimensions)")
+    print(f"   Generated {len(embedded)} embeddings ({actual_dim} dimensions)")
 
     # Step 3: Save to file
     print("\n[4/5] Saving embeddings...")
@@ -95,7 +97,7 @@ def main():
             }
             f.write(json.dumps(obj, ensure_ascii=False) + "\n")
 
-    print(f"   ✓ Saved to: {output_file}")
+    print(f"   Saved to: {output_file}")
 
     # Step 4: Create new Pinecone index
     print("\n[5/5] Setting up Pinecone index...")
@@ -103,7 +105,7 @@ def main():
 
     pc = Pinecone(api_key=cfg.PINECONE_API_KEY)
 
-    new_index_name = "rag-semantic-384"
+    new_index_name = "rag-bedrock-1024"
     print(f"   Creating new index: {new_index_name}")
     print(f"   Dimension: {actual_dim}, Metric: cosine")
 
@@ -121,7 +123,7 @@ def main():
         metric="cosine",
         spec=ServerlessSpec(cloud="aws", region="us-east-1")
     )
-    print(f"   ✓ Index created")
+    print(f"   Index created")
 
     # Wait for index to be ready
     print("   Waiting for index to be ready...")
@@ -153,10 +155,10 @@ def main():
 
     # Verify upload
     stats = index.describe_index_stats()
-    print(f"   ✓ Index now contains {stats.total_vector_count} vectors")
+    print(f"   Index now contains {stats.total_vector_count} vectors")
 
     print("\n" + "=" * 60)
-    print("✅ COMPLETE!")
+    print("COMPLETE!")
     print("=" * 60)
     print(f"\nNext steps:")
     print(f"1. Update config: export PINECONE_INDEX_NAME='{new_index_name}'")

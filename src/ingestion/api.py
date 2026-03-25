@@ -56,8 +56,8 @@ class SyncResult:
 def ingest_from_directory(
     docs_dir: str,
     output_path: str = "data/chunks.jsonl",
-    provider: str = "sentence-transformers",
-    dim: int = 384,
+    provider: str = "bedrock",
+    dim: int = 1024,
     use_docling: bool = True,
     extensions: Optional[List[str]] = None,
     use_structure: bool = True,
@@ -69,7 +69,7 @@ def ingest_from_directory(
     Args:
         docs_dir: Path to directory containing documents
         output_path: Path to save chunks.jsonl
-        provider: Embedding provider ("sentence-transformers" or "local")
+        provider: Embedding provider ("bedrock" or "local")
         dim: Embedding dimension
         use_docling: Use Docling for multi-format parsing (if available)
         extensions: File extensions to process (None = all supported)
